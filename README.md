@@ -1,4 +1,4 @@
-# PG-DPO Visual Sketch (v4)
+# PG-DPO Visual Sketch
 
 A small static demo page for educational use.
 
