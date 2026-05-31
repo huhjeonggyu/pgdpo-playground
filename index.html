@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="PG-DPO in three figures: warm-up, costate estimation, and control recovery in the Merton model."
+    />
+    <title>PG-DPO</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$','$$'], ['\\[','\\]']]
+        },
+        svg: { fontCache: 'global' }
+      };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="hero hero-compact">
+        <div class="hero-compact-row">
+          <p class="eyebrow hero-mark">PG-DPO</p>
+          <div class="action-row">
+            <button id="playButton" class="button primary" type="button">Play</button>
+            <button id="resetButton" class="button secondary" type="button">Reset</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="stage-strip">
+        <div class="stage-panel stage-panel-1">
+          <span class="stage-badge">Stage 1</span>
+          <span class="stage-text">Warm-up</span>
+        </div>
+        <div class="stage-panel stage-panel-2">
+          <span class="stage-badge stage-badge-2">Stage 2</span>
+          <span class="stage-text">Costate estimation and control recovery</span>
+        </div>
+      </section>
+
+      <section class="workflow-row">
+        <article class="figure-card">
+          <div class="figure-head">
+            <div>
+              <p class="eyebrow">Figure 1</p>
+              <h2>Warm-up</h2>
+            </div>
+          </div>
+          <canvas id="fsdeCanvas" width="520" height="190" aria-label="Forward FSDE paths"></canvas>
+          <canvas id="trainCanvas" width="520" height="150" aria-label="Policy network training"></canvas>
+          <p class="caption">Stage 1 trains a feasible policy network by simulation. BPTT through this rollout later provides costate information.</p>
+        </article>
+
+        <article class="figure-card figure-card-wide">
+          <div class="figure-head">
+            <div>
+              <p class="eyebrow">Figure 2</p>
+              <h2>Costate estimation</h2>
+            </div>
+          </div>
+          <div class="figure2-stack">
+            <canvas id="costateCanvas" width="520" height="188" aria-label="Backward costate estimation"></canvas>
+            <canvas id="lambdaConvCanvas" width="520" height="72" aria-label="Lambda convergence"></canvas>
+          </div>
+          <p class="caption">Stage 2 uses BPTT to produce pathwise estimates $\hat{\lambda}^{\mathrm{pw}}_{t_0}$, whose average gives $\hat{\lambda}_{t_0}$ at this Merton point.</p>
+        </article>
+
+        <article class="figure-card">
+          <div class="figure-head">
+            <div>
+              <p class="eyebrow">Figure 3</p>
+              <h2>Control recovery</h2>
+            </div>
+          </div>
+          <canvas id="hamiltonianCanvas" width="520" height="190" aria-label="Hamiltonian maximization and control recovery"></canvas>
+          <div class="track-wrap compact single">
+            <div class="track-card">
+              <div class="track-label-row">
+                <span>Risky weight $\hat{\pi}$</span>
+                <span id="piEstimateText">$\hat{\pi}=0.280$</span>
+              </div>
+              <div class="track">
+                <div class="track-target" id="piTargetMarker"></div>
+                <div class="track-dot" id="piDot"></div>
+              </div>
+              <div class="track-foot">
+                <span id="piStartText">start 0.280</span>
+                <span id="piStarText">critical point 0.750</span>
+              </div>
+            </div>
+          </div>
+          <canvas id="piConvCanvas" width="520" height="100" aria-label="Pi convergence"></canvas>
+          <p class="caption">As $\hat{\lambda}_{t_0}$ improves, $\hat{\pi}$ moves toward the Hamiltonian critical point.</p>
+        </article>
+      </section>
+
+      <section class="equation-row">
+        <article class="eq-card">
+          <h3>Model and objective</h3>
+          <div class="eq-body eq-body-block">
+            <div>$$dX_t = X_t\bigl(r + \pi_t(\mu-r)\bigr)dt + X_t\pi_t\sigma\,dW_t - c_t\,dt$$</div>
+            <div>$$U(x)=\frac{x^{1-\gamma}}{1-\gamma},\qquad \max_{(\pi,c)} \mathbb{E}\left[U(X_T)\right]$$</div>
+          </div>
+        </article>
+        <article class="eq-card">
+          <h3>Hamiltonian</h3>
+          <div class="eq-body eq-body-block">
+            <div>$$H(x,\pi,\lambda)=\lambda x\bigl(r+\pi(\mu-r)\bigr)-\frac{1}{2}\gamma\lambda x\sigma^2\pi^2$$</div>
+          </div>
+        </article>
+        <article class="eq-card">
+          <h3>Recovered control</h3>
+          <div class="eq-body eq-body-block">
+            <div>$$\hat{\pi}_t=-\frac{\hat{\lambda}_t}{X_t\,\partial_x\hat{\lambda}_t}\,\frac{\mu-r}{\sigma^2}$$</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="note-card">
+        <p><strong>Scope.</strong> This page shows the idea at one Merton point $(t_0,x_0)$. In the full PG-DPO method, the same costate-to-control step is learned over a Markov state domain.</p>
+        <p><strong>Extension.</strong> Beyond this Merton example, the PG-DPO idea can be extended to constrained control, non-Markovian dynamics, non-exponential discounting, transaction costs, and other continuous-time decision problems.</p>
+      </section>
+
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
