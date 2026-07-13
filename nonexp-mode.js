@@ -43,14 +43,14 @@
 
   function drawKernel() {
     const { ctx, width, height } = setupCanvas(els.kernel); if (!ctx || width < 2) return; drawBackground(ctx, width, height);
-    const left = 70, right = width - 30, top = 46, bottom = height - 34, reveal = easeOut(state.warmup);
+    const left = 70, right = width - 30, top = 56, bottom = height - 34, reveal = easeOut(state.warmup);
     const xs = t => left + t * (right - left);
     const rowGap = (bottom - top) / 3;
 
     ctx.fillStyle = COLORS.text; ctx.font = "bold 11px Inter,system-ui,sans-serif";
-    ctx.fillText("The same future payoff is re-valued by each current self", 16, 20);
+    ctx.fillText("Same future payoff, different decision-time weights", 16, 18);
     ctx.fillStyle = COLORS.yellow; ctx.font = "10px Inter,system-ui,sans-serif";
-    ctx.textAlign = "right"; ctx.fillText("re-anchor the objective at every decision time", width - 16, 20); ctx.textAlign = "left";
+    ctx.fillText("Re-anchor the continuation objective at every t₀", 16, 35);
 
     queries.forEach((q, i) => {
       const y = top + (i + .45) * rowGap, ax = xs(q.t), rx = lerp(ax, right, reveal), finalWeight = kernel(q.t, 1);
@@ -74,7 +74,7 @@
     const carried = kernel(e, 1) / kernel(e, m), reanchored = kernel(m, 1);
     ctx.fillStyle = "rgba(255,255,255,.035)"; ctx.fillRect(14, height - 32, width - 28, 22);
     ctx.fillStyle = COLORS.muted; ctx.font = "10px Inter,system-ui,sans-serif";
-    ctx.fillText(`earlier continuation weight ${carried.toFixed(2)}  ≠  re-anchored weight ${reanchored.toFixed(2)}  →  the continuation problem changes`, 22, height - 17);
+    ctx.fillText(`carried-forward ${carried.toFixed(2)}  ≠  re-anchored ${reanchored.toFixed(2)}  →  continuation problem changes`, 22, height - 17);
   }
 
   function drawAnchor() {
@@ -166,7 +166,7 @@
   function drawRecovery() {
     const { ctx, width, height } = setupCanvas(els.recovery); if (!ctx || width < 2) return; drawBackground(ctx, width, height);
     const outer = 14, gap = 10, top = 42, bottom = height - 28, panelW = (width - 2 * outer - 2 * gap) / 3;
-    ctx.fillStyle = COLORS.text; ctx.font = "bold 11px Inter,system-ui,sans-serif"; ctx.fillText("At each query: estimate the diagonal adjoint, then maximize the local Hamiltonian", 14, 20);
+    ctx.fillStyle = COLORS.text; ctx.font = "bold 11px Inter,system-ui,sans-serif"; ctx.fillText("Each query uses λ̂(t,t) to maximize its local Hamiltonian", 14, 20);
     ctx.fillStyle = COLORS.muted; ctx.font = "9px Inter,system-ui,sans-serif"; ctx.fillText("warm-up action  →  arg maxᵤ H(t,t,x,u,λ̂,Ẑ)", 14, 34);
 
     queries.forEach((q, i) => {
