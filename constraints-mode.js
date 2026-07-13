@@ -13,6 +13,9 @@
   if (nearLabel) nearLabel.innerHTML = '<span class="insight-swatch tone-near"></span>Near boundary';
   const activeLabel = document.querySelector('[data-paper-panel="constraints"] .insight-card[data-tone="active"] .insight-card-head > span:first-child');
   if (activeLabel) activeLabel.innerHTML = '<span class="insight-swatch tone-active"></span>Active boundary';
+  const constraintRecoveryPanel = els.recovery?.closest('[data-paper-panel="constraints"]');
+  const constraintCaption = constraintRecoveryPanel?.querySelector('.caption');
+  if (constraintCaption) constraintCaption.textContent = "The active query wants to move beyond the feasible set, so KKT recovery stops at u₁=0; the same adjoints also handle near-boundary and interior queries.";
 
   const queries = [
     { id: "active", label: "A", color: COLORS.red, soft: COLORS.redSoft, start: [0.22, 0.42], target: [0, 0.58], unconstrained: [-0.16, 0.66], r0: 5.2e-2, r1: 1.1e-4 },
