@@ -1,4 +1,3 @@
-
 const els = {
   fsdeCanvas: document.getElementById("fsdeCanvas"),
   costateCanvas: document.getElementById("costateCanvas"),
@@ -13,6 +12,16 @@ const els = {
   piStartText: document.getElementById("piStartText"),
   piStarText: document.getElementById("piStarText"),
 };
+
+// A previous compatibility layer added a separate synthetic glow canvas over
+// the shared costate chart. The core animation now follows the actual costate
+// paths directly, so keep that legacy overlay hidden if it is installed later.
+if (!document.getElementById("core-path-bptt-style")) {
+  const style = document.createElement("style");
+  style.id = "core-path-bptt-style";
+  style.textContent = "#coreBpttGlowCanvas { display: none !important; }";
+  document.head.appendChild(style);
+}
 
 const model = {
   r: 0.03,
@@ -308,19 +317,56 @@ function drawBPTTFigure() {
 }
 
 function drawCostatePath(ctx, xScale, yScale, path, color, widthLine, alphaFull=1, glowTo=0) {
-  // draw faint full path
+  // The path itself remains visible; BPTT then travels from T toward t₀ on
+  // this exact curve rather than on a separate synthetic overlay.
   ctx.beginPath();
-  for (let k = model.steps; k >= 0; k -= 1) { const x = xScale(k), y = yScale(path[k]); if (k === model.steps) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
-  ctx.strokeStyle = color.replace('ALPHA', alphaFull.toFixed(3)); ctx.lineWidth = widthLine; ctx.stroke();
-  // draw sweeping glow from T backwards
-  if (glowTo > 0) {
-    const revealFrom = Math.round(model.steps * (1 - glowTo));
-    ctx.save();
-    ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(255,176,122,0.85)';
+  for (let k = model.steps; k >= 0; k -= 1) {
+    const x = xScale(k), y = yScale(path[k]);
+    if (k === model.steps) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = color.replace('ALPHA', alphaFull.toFixed(3));
+  ctx.lineWidth = widthLine;
+  ctx.stroke();
+
+  if (glowTo <= 0) return;
+
+  const frontIndex = clamp(Math.round(model.steps * (1 - glowTo)), 0, model.steps);
+  const tailLength = Math.max(7, Math.round(model.steps * 0.24));
+  const tailIndex = Math.min(model.steps, frontIndex + tailLength);
+
+  ctx.save();
+  ctx.shadowBlur = 16;
+  ctx.shadowColor = 'rgba(255,176,122,0.92)';
+  ctx.beginPath();
+  for (let k = tailIndex; k >= frontIndex; k -= 1) {
+    const x = xScale(k), y = yScale(path[k]);
+    if (k === tailIndex) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = 'rgba(255,228,141,0.96)';
+  ctx.lineWidth = widthLine + 1.8;
+  ctx.stroke();
+  ctx.restore();
+
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.012);
+  const frontX = xScale(frontIndex), frontY = yScale(path[frontIndex]);
+  ctx.save();
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = 'rgba(255,228,141,0.98)';
+  ctx.beginPath();
+  ctx.fillStyle = `rgba(255,228,141,${0.80 + 0.16 * pulse})`;
+  ctx.arc(frontX, frontY, 3.5 + 1.2 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // The trailing sparks also sample the same costate path, so every visible
+  // particle respects its local geometry instead of drifting horizontally.
+  for (let j = 1; j <= 3; j += 1) {
+    const idx = Math.min(model.steps, frontIndex + Math.round((tailLength * j) / 4));
+    const alpha = 0.50 - 0.10 * (j - 1);
     ctx.beginPath();
-    for (let k = model.steps; k >= revealFrom; k -= 1) { const x=xScale(k), y=yScale(path[k]); if (k===model.steps) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
-    ctx.strokeStyle = 'rgba(255,228,141,0.95)'; ctx.lineWidth = widthLine + 1.7; ctx.stroke();
-    ctx.restore();
+    ctx.fillStyle = `rgba(255,176,122,${alpha})`;
+    ctx.arc(xScale(idx), yScale(path[idx]), 2.2 - 0.35 * (j - 1), 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
@@ -338,7 +384,7 @@ function drawFigure2() {
   for (let p = 0; p < visDone; p += 1) {
     drawCostatePath(ctx, xScale, yScale, data.costates[p], 'rgba(255,176,122,ALPHA)', p < 4 ? 1.8 : 1.0, p < 4 ? 0.80 : 0.18, 0);
   }
-  // current stage paths glow in from the back
+  // current stage paths glow in from the back on their own geometry
   if (state.forwardPhase >= 1 && completed < visCounts.length) {
     const newCount = visTarget - visDone;
     for (let j = 0; j < newCount; j += 1) {
@@ -355,6 +401,10 @@ function drawFigure2() {
   ctx.fillText("Averaging those pathwise estimates gives λ̂(t₀).", pad.left + 8, pad.top + 42);
   ctx.fillStyle = "rgba(255,228,141,0.92)";
   ctx.fillText(`BPTT samples: ${countDisplay}`, pad.left + 8, pad.top + 58);
+  ctx.font = "bold 10px Inter, system-ui, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText("BPTT backward:  t₀  ←  T", width - pad.right, 18);
+  ctx.textAlign = "left";
 }
 
 function drawLambdaConvergence() {
