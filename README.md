@@ -21,17 +21,18 @@ The first two figures are shared. Figure 3 can switch between two local correcti
 2. **Costate estimation.** BPTT produces pathwise sensitivities; Monte Carlo averaging gives a local marginal-value signal.
 3. **Local correction.** The selected mode maps the estimated costate signal to a current action.
 
-The animation is educational: the simulation is real, while the displayed convergence paths are schematic rather than live training output.
+The animation is educational: the forward simulation is real, while the displayed convergence paths are schematic rather than live training output.
 
 ## Files
 
-- `index.html` - page structure and mode switch.
-- `app.js` - shared rollout, costate figures, animation state, and orchestration.
-- `recovery-modes.js` - registry of mode-specific Figure 3 implementations.
-- `style.css` - responsive dark-theme layout.
-- `docs/transaction-costs.md` - mathematical note for the transaction-cost mode.
-- `docs/adding-a-recovery-mode.md` - short guide for adding another local correction.
-- `references/recovering-no-trade-regions-aqfc-2026.md` - text companion with the key formulas and references.
+- `index.html` — page structure and Figure 3 mode switch.
+- `app.js` — shared rollout, costate figures, and the original smooth recovery animation.
+- `local-corrections.js` — transaction-cost renderer, mode switching, and URL state.
+- `style.css` — base responsive dark-theme layout.
+- `local-corrections.css` — mode-switch and transaction-cost styling.
+- `docs/transaction-costs.md` — mathematical note for the transaction-cost mode.
+- `docs/adding-a-recovery-mode.md` — short guide for adding another local correction.
+- `references/recovering-no-trade-regions-aqfc-2026.md` — text companion with the key formulas and references.
 
 ## Local preview
 
