@@ -62,7 +62,7 @@
 }
 
 .paper-equation-stack > [data-paper-equations][hidden] {
-  display: block !important;
+  display: grid !important;
   visibility: hidden;
   pointer-events: none;
 }
@@ -71,6 +71,17 @@
   display: block !important;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Keep the equation row compact while giving the mathematics more breathing room. */
+.paper-equation-stack .eq-card {
+  padding: 11px 12px 12px;
+}
+
+.paper-equation-stack .eq-body {
+  margin-top: 7px;
+  min-height: 82px;
+  padding: 9px 5px 11px;
 }
 
 #constraintRolloutCanvas,
@@ -221,6 +232,8 @@
 @media (max-height: 900px) {
   .paper-mode-row { margin-top: 5px; }
   .paper-mode-switch .mode-button { padding: 6px 10px; font-size: 11px; }
+  .paper-equation-stack .eq-card { padding: 9px 10px 10px; }
+  .paper-equation-stack .eq-body { min-height: 70px; padding: 7px 4px 9px; }
   .insight-panel { margin-top: 5px; padding: 6px; }
   .insight-panel-head { margin-bottom: 5px; }
   .insight-card { padding: 6px; }
