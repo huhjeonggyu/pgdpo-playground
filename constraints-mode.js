@@ -125,10 +125,14 @@
   }
 
   function adjointSample(kind, sample, t) {
-    const amplitude = kind === "lambda" ? .014 + .0022 * (sample % 4) : .018 + .0026 * (sample % 4);
+    const primaryAmplitude = kind === "lambda" ? .030 + .0045 * (sample % 4) : .039 + .0055 * (sample % 4);
+    const secondaryAmplitude = kind === "lambda" ? .010 + .0016 * ((sample + 1) % 3) : .014 + .0020 * ((sample + 2) % 3);
     const phase = .79 * sample + (kind === "lambda" ? .15 : 1.05);
-    const slowShift = (sample - (maxAdjointSamples - 1) / 2) * (kind === "lambda" ? .0018 : .0023) * (1 - .45 * t);
-    return adjointBase(kind, t) + amplitude * Math.sin(8.5 * t + phase) * (1 - .38 * t) + slowShift;
+    const secondaryPhase = 1.37 * sample + (kind === "lambda" ? .72 : 1.62);
+    const slowShift = (sample - (maxAdjointSamples - 1) / 2) * (kind === "lambda" ? .0042 : .0054) * (1 - .35 * t);
+    const primary = primaryAmplitude * Math.sin(7.6 * t + phase) * (1 - .28 * t);
+    const secondary = secondaryAmplitude * Math.sin(17.4 * t + secondaryPhase) * (.82 - .24 * t);
+    return adjointBase(kind, t) + primary + secondary + slowShift;
   }
 
   function strokeAdjointPath(ctx, xs, ys, kind, sample, startT, endT, color, alpha, lineWidth, glow = false) {
@@ -171,7 +175,7 @@
     for (let i = 0; i <= 3; i++) { const y = top + i / 3 * height; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke(); }
 
     for (let sample = 0; sample < progressInfo.deposited; sample++) {
-      strokeAdjointPath(ctx, xs, ys, kind, sample, 0, 1, color, .31, sample < 2 ? 1.35 : 1.05);
+      strokeAdjointPath(ctx, xs, ys, kind, sample, 0, 1, color, .36, sample < 2 ? 1.45 : 1.10);
     }
     if (progressInfo.active > .005 && progressInfo.deposited < maxAdjointSamples) {
       const front = 1 - progressInfo.active;
