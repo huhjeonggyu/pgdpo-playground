@@ -1,7 +1,7 @@
 # Transaction-cost recovery mode
 
 This note explains the transaction-cost example used in Figure 3 of the PG-DPO playground.
-Figures 1 and 2 remain unchanged: a continuation policy generates rollouts, and BPTT estimates a local marginal-value signal. Only the final costate-to-action map changes.
+Figures 1 and 2 remain unchanged: a continuation policy generates rollouts, and BPTT estimates local marginal-value signals. Only the final costate-to-action map changes.
 
 ## 1. State, liquidation wealth, and trading rate
 
@@ -81,15 +81,17 @@ The wedge location is set by transaction costs. The parameter \(\varepsilon\) co
 
 ## 4. What the animation represents
 
-The transaction-cost panel shows one query point:
+The transaction-cost panel compares three representative query points under the same local map:
 
-1. a schematic BPTT estimate \(\widehat R\) improves as the displayed path count increases;
-2. the estimate crosses from the buy region into the hold wedge;
-3. the dead-zone map returns a signed trading rate \(\widehat u=P_{\varepsilon}(\widehat R)\).
+1. a sell query with \(\widehat R<1-\alpha\) and \(\widehat u<0\);
+2. a hold query with \(1-\alpha\le\widehat R\le1\) and \(\widehat u=0\);
+3. a buy query with \(\widehat R>1\) and \(\widehat u>0\).
+
+For each query, the displayed BPTT estimate improves as the schematic path count increases, and the dead-zone map returns the signed trading rate \(\widehat u=P_{\varepsilon}(\widehat R)\).
 
 Repeating the same local classification over a state domain traces a no-trade region. In multiple assets, the projection is componentwise after the covariance-aware costate vector has been estimated, so the recovered state-space geometry need not be a rectangular product of one-dimensional bands.
 
-The convergence curve on the playground is schematic rather than a live training output.
+The convergence curves on the playground are schematic rather than live training outputs.
 
 ## 5. Classical references
 

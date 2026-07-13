@@ -7,23 +7,57 @@
   const tc = {
     alpha: 0.10,
     epsilon: 0.18,
-    ratioMin: 0.78,
-    ratioMax: 1.12,
-    ratioStart: 1.085,
-    ratioTrue: 0.955,
+    ratioMin: 0.80,
+    ratioMax: 1.10,
   };
   tc.lower = 1 - tc.alpha;
   tc.upper = 1;
 
-  const stageRatio = [tc.ratioStart];
-  stageCounts.forEach((count, i) => {
-    const decay = Math.exp(-1.45 * Math.log10(count));
-    const wiggle = i >= stageCounts.length - 2
-      ? 0
-      : 0.009 * Math.exp(-0.34 * (i + 1)) * Math.sin(0.92 * (i + 1));
-    stageRatio.push(tc.ratioTrue + (tc.ratioStart - tc.ratioTrue) * decay + wiggle);
+  const querySpecs = [
+    {
+      id: "sell",
+      shortLabel: "S",
+      ratioStart: 0.875,
+      ratioTrue: 0.850,
+      color: "rgba(255,133,133,1)",
+      softColor: "rgba(255,133,133,0.32)",
+      phase: 0.35,
+    },
+    {
+      id: "hold",
+      shortLabel: "H",
+      ratioStart: 0.980,
+      ratioTrue: 0.955,
+      color: "rgba(148,240,193,1)",
+      softColor: "rgba(148,240,193,0.32)",
+      phase: 1.55,
+    },
+    {
+      id: "buy",
+      shortLabel: "B",
+      ratioStart: 1.035,
+      ratioTrue: 1.060,
+      color: "rgba(255,176,122,1)",
+      softColor: "rgba(255,176,122,0.32)",
+      phase: 2.65,
+    },
+  ];
+
+  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  function fmt(x, digits = 3) { return Number.isFinite(x) ? x.toFixed(digits) : "—"; }
+
+  querySpecs.forEach((query, queryIndex) => {
+    query.stageRatios = [query.ratioStart];
+    stageCounts.forEach((count, i) => {
+      const decay = Math.exp(-1.45 * Math.log10(count));
+      const wiggle = i >= stageCounts.length - 2
+        ? 0
+        : 0.0035 * Math.exp(-0.38 * (i + 1)) * Math.sin(0.90 * (i + 1) + query.phase);
+      const value = query.ratioTrue + (query.ratioStart - query.ratioTrue) * decay + wiggle * (queryIndex === 1 ? 0.75 : 1);
+      query.stageRatios.push(value);
+    });
+    query.stageRatios[query.stageRatios.length - 1] = query.ratioTrue;
   });
-  stageRatio[stageRatio.length - 1] = tc.ratioTrue + 0.0015;
 
   const els = {
     title: document.getElementById("recoveryTitle"),
@@ -32,15 +66,25 @@
     equations: Array.from(document.querySelectorAll("[data-recovery-equations]")),
     projectionCanvas: document.getElementById("tcProjectionCanvas"),
     convergenceCanvas: document.getElementById("tcConvergenceCanvas"),
-    estimateText: document.getElementById("tcEstimateText"),
-    regimeBadge: document.getElementById("tcRegimeBadge"),
-    dot: document.getElementById("tcDot"),
-    target: document.getElementById("tcTargetMarker"),
-    footLeft: document.getElementById("tcFootLeft"),
-    footCenter: document.getElementById("tcFootCenter"),
-    footRight: document.getElementById("tcFootRight"),
     playButton: document.getElementById("playButton"),
     resetButton: document.getElementById("resetButton"),
+    queries: {
+      sell: {
+        card: document.getElementById("tcSellCard"),
+        estimate: document.getElementById("tcSellEstimateText"),
+        badge: document.getElementById("tcSellRegimeBadge"),
+      },
+      hold: {
+        card: document.getElementById("tcHoldCard"),
+        estimate: document.getElementById("tcHoldEstimateText"),
+        badge: document.getElementById("tcHoldRegimeBadge"),
+      },
+      buy: {
+        card: document.getElementById("tcBuyCard"),
+        estimate: document.getElementById("tcBuyEstimateText"),
+        badge: document.getElementById("tcBuyRegimeBadge"),
+      },
+    },
   };
 
   const state = {
@@ -52,17 +96,19 @@
     lastTimestamp: 0,
   };
 
-  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
-  function fmt(x, digits = 3) { return Number.isFinite(x) ? x.toFixed(digits) : "—"; }
-
   function setupCanvas(canvas) {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    const width = rect.width || canvas.width;
-    const height = rect.height || canvas.height;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    const width = rect.width;
+    const height = rect.height;
     const ctx = canvas.getContext("2d");
+    if (width < 2 || height < 2) return { ctx, width: 0, height: 0 };
+    const pixelWidth = Math.max(1, Math.round(width * dpr));
+    const pixelHeight = Math.max(1, Math.round(height * dpr));
+    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return { ctx, width, height };
   }
@@ -81,11 +127,17 @@
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     for (let i = 0; i <= rows; i += 1) {
       const y = pad.top + (i / rows) * (height - pad.top - pad.bottom);
-      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(width - pad.right, y);
+      ctx.stroke();
     }
     for (let j = 0; j <= cols; j += 1) {
       const x = pad.left + (j / cols) * (width - pad.left - pad.right);
-      ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, height - pad.bottom); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, height - pad.bottom);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -126,11 +178,14 @@
     return { completed, progress };
   }
 
-  function currentRatio() {
+  function currentRatio(query) {
     const { completed, progress } = stageContext();
-    if (completed === 0) return tc.ratioStart;
-    if (completed >= stageCounts.length) return tc.ratioTrue;
-    return stageRatio[completed] + (stageRatio[completed + 1] - stageRatio[completed]) * progress;
+    if (completed === 0) {
+      const first = query.stageRatios[1];
+      return query.ratioStart + (first - query.ratioStart) * progress;
+    }
+    if (completed >= stageCounts.length) return query.ratioTrue;
+    return query.stageRatios[completed] + (query.stageRatios[completed + 1] - query.stageRatios[completed]) * progress;
   }
 
   function drawProjectionBranch(ctx, xScale, yScale, start, end, color) {
@@ -154,7 +209,7 @@
     drawGrid(ctx, width, height, pad);
     drawAxes(ctx, width, height, pad, "costate ratio R", "trading rate û");
 
-    const yBound = 0.72;
+    const yBound = 0.62;
     const xScale = (r) => pad.left + ((r - tc.ratioMin) / (tc.ratioMax - tc.ratioMin)) * (width - pad.left - pad.right);
     const yScale = (u) => height - pad.bottom - ((u + yBound) / (2 * yBound)) * (height - pad.top - pad.bottom);
     const lowerX = xScale(tc.lower);
@@ -164,11 +219,20 @@
     ctx.fillStyle = "rgba(148,240,193,0.10)";
     ctx.fillRect(lowerX, pad.top, upperX - lowerX, height - pad.top - pad.bottom);
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
-    ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(width - pad.right, zeroY); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pad.left, zeroY);
+    ctx.lineTo(width - pad.right, zeroY);
+    ctx.stroke();
+
     ctx.save();
     ctx.setLineDash([5, 5]);
     ctx.strokeStyle = "rgba(255,255,255,0.28)";
-    [lowerX, upperX].forEach((x) => { ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, height - pad.bottom); ctx.stroke(); });
+    [lowerX, upperX].forEach((x) => {
+      ctx.beginPath();
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, height - pad.bottom);
+      ctx.stroke();
+    });
     ctx.restore();
 
     drawProjectionBranch(ctx, xScale, yScale, tc.ratioMin, tc.lower, "rgba(255,133,133,0.92)");
@@ -177,110 +241,160 @@
 
     ctx.font = "11px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(255,170,170,0.90)"; ctx.fillText("SELL", (pad.left + lowerX) / 2, pad.top + 14);
-    ctx.fillStyle = "rgba(189,255,220,0.92)"; ctx.fillText("HOLD", (lowerX + upperX) / 2, pad.top + 14);
-    ctx.fillStyle = "rgba(255,205,170,0.92)"; ctx.fillText("BUY", (upperX + width - pad.right) / 2, pad.top + 14);
+    ctx.fillStyle = "rgba(255,170,170,0.90)";
+    ctx.fillText("SELL", (pad.left + lowerX) / 2, pad.top + 14);
+    ctx.fillStyle = "rgba(189,255,220,0.92)";
+    ctx.fillText("HOLD", (lowerX + upperX) / 2, pad.top + 14);
+    ctx.fillStyle = "rgba(255,205,170,0.92)";
+    ctx.fillText("BUY", (upperX + width - pad.right) / 2, pad.top + 14);
     ctx.fillStyle = "rgba(241,246,255,0.66)";
     ctx.font = "10px Inter, system-ui, sans-serif";
     ctx.fillText(`1 − α = ${fmt(tc.lower)}`, lowerX, height - pad.bottom + 15);
     ctx.fillText("1", upperX, height - pad.bottom + 15);
 
-    const ratio = currentRatio();
-    const trade = projectedTrade(ratio);
-    const currentRegime = regime(ratio);
-    const pointX = xScale(ratio);
-    const pointY = yScale(trade);
-    const colors = { sell: "rgba(255,133,133,1)", hold: "rgba(148,240,193,1)", buy: "rgba(255,176,122,1)" };
-    ctx.save();
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = colors[currentRegime];
+    querySpecs.forEach((query) => {
+      const ratio = currentRatio(query);
+      const trade = projectedTrade(ratio);
+      const pointX = xScale(ratio);
+      const pointY = yScale(trade);
+      const targetX = xScale(query.ratioTrue);
+      const targetY = yScale(projectedTrade(query.ratioTrue));
+
+      ctx.save();
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = query.softColor;
+      ctx.beginPath();
+      ctx.moveTo(pointX, pointY);
+      ctx.lineTo(targetX, targetY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.strokeStyle = query.softColor;
+      ctx.lineWidth = 2;
+      ctx.arc(targetX, targetY, 8.2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = query.color;
+      ctx.beginPath();
+      ctx.fillStyle = query.color;
+      ctx.arc(pointX, pointY, 6.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.fillStyle = "rgba(241,246,255,0.94)";
+      ctx.font = "bold 11px Inter, system-ui, sans-serif";
+      if (query.id === "buy") {
+        ctx.textAlign = "right";
+        ctx.fillText(query.shortLabel, pointX - 10, pointY - 9);
+      } else {
+        ctx.textAlign = "left";
+        ctx.fillText(query.shortLabel, pointX + 10, pointY - 9);
+      }
+    });
+  }
+
+  function drawConvergencePath(ctx, query, xScale, yScale, completed, progress) {
+    if (completed === 0) {
+      const x = xScale(stageCounts[0]);
+      const y = yScale(currentRatio(query));
+      ctx.beginPath();
+      ctx.fillStyle = query.color;
+      ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
     ctx.beginPath();
-    ctx.fillStyle = colors[currentRegime];
-    ctx.arc(pointX, pointY, 6.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = "rgba(241,246,255,0.88)";
-    ctx.font = "11px Inter, system-ui, sans-serif";
-    ctx.textAlign = ratio > 1.02 ? "right" : "left";
-    ctx.fillText(
-      currentRegime === "hold" ? "dead-zone: no trade" : `${currentRegime} correction`,
-      ratio > 1.02 ? pointX - 9 : pointX + 9,
-      currentRegime === "hold" ? pointY - 12 : pointY - 9,
-    );
+    for (let i = 1; i <= completed; i += 1) {
+      const x = xScale(stageCounts[i - 1]);
+      const y = yScale(query.stageRatios[i]);
+      if (i === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    if (completed < stageCounts.length) {
+      const x0 = xScale(stageCounts[completed - 1]);
+      const y0 = yScale(query.stageRatios[completed]);
+      const x1 = xScale(stageCounts[completed]);
+      const y1 = yScale(query.stageRatios[completed + 1]);
+      ctx.lineTo(x0 + (x1 - x0) * progress, y0 + (y1 - y0) * progress);
+    }
+    ctx.strokeStyle = query.color;
+    ctx.lineWidth = 2.25;
+    ctx.stroke();
   }
 
   function drawConvergence() {
     const { ctx, width, height } = setupCanvas(els.convergenceCanvas);
     if (width < 2 || height < 2) return;
     drawBackground(ctx, width, height);
-    const pad = { left: 46, right: 18, top: 20, bottom: 28 };
+    const pad = { left: 46, right: 25, top: 20, bottom: 28 };
     drawGrid(ctx, width, height, pad, 4, 6);
     drawAxes(ctx, width, height, pad, "number of paths", "R̂");
 
     const xMax = stageCounts[stageCounts.length - 1];
     const xScale = (count) => pad.left + (Math.log10(Math.max(count, 1)) / Math.log10(xMax)) * (width - pad.left - pad.right);
-    const yMin = 0.86;
-    const yMax = 1.10;
+    const yMin = 0.82;
+    const yMax = 1.08;
     const yScale = (r) => height - pad.bottom - ((r - yMin) / (yMax - yMin)) * (height - pad.top - pad.bottom);
 
     const holdTop = yScale(tc.upper);
     const holdBottom = yScale(tc.lower);
     ctx.fillStyle = "rgba(148,240,193,0.10)";
     ctx.fillRect(pad.left, holdTop, width - pad.left - pad.right, holdBottom - holdTop);
+
     ctx.save();
     ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = "rgba(255,255,255,0.28)";
-    [tc.lower, tc.upper].forEach((r) => { ctx.beginPath(); ctx.moveTo(xScale(1), yScale(r)); ctx.lineTo(xScale(xMax), yScale(r)); ctx.stroke(); });
-    ctx.strokeStyle = "rgba(255,228,141,0.72)";
-    ctx.beginPath(); ctx.moveTo(xScale(1), yScale(tc.ratioTrue)); ctx.lineTo(xScale(xMax), yScale(tc.ratioTrue)); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    [tc.lower, tc.upper].forEach((r) => {
+      ctx.beginPath();
+      ctx.moveTo(xScale(1), yScale(r));
+      ctx.lineTo(xScale(xMax), yScale(r));
+      ctx.stroke();
+    });
+    querySpecs.forEach((query) => {
+      ctx.strokeStyle = query.softColor;
+      ctx.beginPath();
+      ctx.moveTo(xScale(1), yScale(query.ratioTrue));
+      ctx.lineTo(xScale(xMax), yScale(query.ratioTrue));
+      ctx.stroke();
+    });
     ctx.restore();
 
-    ctx.font = "10px Inter, system-ui, sans-serif";
     ctx.fillStyle = "rgba(189,255,220,0.84)";
+    ctx.font = "10px Inter, system-ui, sans-serif";
     ctx.fillText("hold wedge", pad.left + 7, yScale(tc.upper) + 12);
-    ctx.fillStyle = "rgba(255,228,141,0.88)";
-    ctx.textAlign = "right";
-    ctx.fillText("true R", width - pad.right - 4, yScale(tc.ratioTrue) - 6);
-    ctx.textAlign = "left";
 
     const { completed, progress } = stageContext();
-    if (completed > 0) {
-      ctx.beginPath();
-      for (let i = 1; i <= completed; i += 1) {
-        const x = xScale(stageCounts[i - 1]);
-        const y = yScale(stageRatio[i]);
-        if (i === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      if (completed < stageCounts.length) {
-        const x0 = xScale(stageCounts[completed - 1]);
-        const y0 = yScale(stageRatio[completed]);
-        const x1 = xScale(stageCounts[completed]);
-        const y1 = yScale(stageRatio[completed + 1]);
-        ctx.lineTo(x0 + (x1 - x0) * progress, y0 + (y1 - y0) * progress);
-      }
-      ctx.strokeStyle = "rgba(143,216,255,0.96)";
-      ctx.lineWidth = 2.4;
-      ctx.stroke();
-    }
+    querySpecs.forEach((query) => drawConvergencePath(ctx, query, xScale, yScale, completed, progress));
+
+    ctx.font = "bold 10px Inter, system-ui, sans-serif";
+    ctx.textAlign = "right";
+    querySpecs.forEach((query) => {
+      ctx.fillStyle = query.color;
+      ctx.fillText(query.shortLabel, width - pad.right - 3, yScale(query.ratioTrue) - 4);
+    });
+    ctx.textAlign = "left";
   }
 
-  function updateTrack() {
-    const ratio = currentRatio();
-    const trade = projectedTrade(ratio);
-    const currentRegime = regime(ratio);
-    const position = 100 * clamp((ratio - tc.ratioMin) / (tc.ratioMax - tc.ratioMin), 0, 1);
-    els.dot.style.left = `${position}%`;
-    els.dot.dataset.regime = currentRegime;
-    els.estimateText.textContent = `R̂ = ${fmt(ratio)} · û = ${fmt(trade)}`;
-    els.regimeBadge.textContent = currentRegime.toUpperCase();
-    els.regimeBadge.dataset.regime = currentRegime;
+  function updateQueryCards() {
+    querySpecs.forEach((query) => {
+      const ratio = currentRatio(query);
+      const trade = projectedTrade(ratio);
+      const currentRegime = regime(ratio);
+      const queryEls = els.queries[query.id];
+      queryEls.card.dataset.regime = currentRegime;
+      queryEls.estimate.textContent = `R̂ = ${fmt(ratio)} · û = ${fmt(trade)}`;
+      queryEls.badge.textContent = currentRegime.toUpperCase();
+      queryEls.badge.dataset.regime = currentRegime;
+    });
   }
 
   function drawTransaction() {
     if (state.mode !== "transaction") return;
     drawProjection();
     drawConvergence();
-    updateTrack();
+    updateQueryCards();
   }
 
   function typesetVisibleEquations() {
@@ -302,6 +416,7 @@
     els.equations.forEach((row) => { row.hidden = row.dataset.recoveryEquations !== selected; });
     drawTransaction();
     typesetVisibleEquations();
+    window.requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
 
     if (updateUrl) {
       const url = new URL(window.location.href);
@@ -328,7 +443,7 @@
 
   function animate(timestamp) {
     if (!state.lastTimestamp) state.lastTimestamp = timestamp;
-    const dt = (timestamp - state.lastTimestamp) / 1000;
+    const dt = Math.min((timestamp - state.lastTimestamp) / 1000, 0.10);
     state.lastTimestamp = timestamp;
 
     if (state.playing) {
@@ -349,11 +464,6 @@
     drawTransaction();
     window.requestAnimationFrame(animate);
   }
-
-  els.footLeft.textContent = `sell < ${fmt(tc.lower)}`;
-  els.footCenter.textContent = `hold [${fmt(tc.lower)}, ${fmt(tc.upper)}]`;
-  els.footRight.textContent = `buy > ${fmt(tc.upper)}`;
-  els.target.style.left = `${100 * (tc.ratioTrue - tc.ratioMin) / (tc.ratioMax - tc.ratioMin)}%`;
 
   els.buttons.forEach((button) => {
     button.addEventListener("click", () => setMode(button.dataset.recoveryMode, true));
