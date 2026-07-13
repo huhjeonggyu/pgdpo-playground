@@ -51,6 +51,77 @@
     if (canvas) canvas.style.aspectRatio = `520 / ${height}`;
   });
 
+  // The Hamiltonian alone does not identify the adjoint variables shown in the
+  // figures. Add the corresponding BSDE directly below each Hamiltonian card.
+  if (!document.getElementById("adjoint-bsde-styles")) {
+    const style = document.createElement("style");
+    style.id = "adjoint-bsde-styles";
+    style.textContent = `
+      .adjoint-bsde-block {
+        width: 100%;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+      }
+      .adjoint-bsde-label {
+        margin-bottom: 3px;
+        color: rgba(168,199,255,0.82);
+        font-size: 0.60rem;
+        font-weight: 800;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+      }
+      .adjoint-bsde-block mjx-container {
+        margin: 0.18em 0 !important;
+        font-size: 68% !important;
+      }
+      .adjoint-bsde-block.is-dense mjx-container {
+        font-size: 57% !important;
+      }
+      @media (max-width: 700px) {
+        .adjoint-bsde-block mjx-container { font-size: 62% !important; }
+        .adjoint-bsde-block.is-dense mjx-container { font-size: 52% !important; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function appendBsde(selector, label, lines, dense = false) {
+    const body = document.querySelector(selector);
+    if (!body || body.querySelector(".adjoint-bsde-block")) return;
+    const block = document.createElement("div");
+    block.className = `adjoint-bsde-block${dense ? " is-dense" : ""}`;
+    block.innerHTML = `<div class="adjoint-bsde-label">${label}</div>${lines.map((tex) => `<div>$$${tex}$$</div>`).join("")}`;
+    body.appendChild(block);
+  }
+
+  appendBsde(
+    '[data-recovery-equations="smooth"] .eq-card:nth-child(2) .eq-body',
+    "Adjoint BSDE",
+    [String.raw`-d\lambda_t=\partial_x H_t\,dt-Z_t\,dW_t,\qquad \lambda_T=U'(X_T)`],
+  );
+  appendBsde(
+    '[data-recovery-equations="transaction"] .eq-card:nth-child(2) .eq-body',
+    "Vector adjoint BSDE",
+    [String.raw`-d\Lambda_t=\nabla_z H_t\,dt-\mathcal M_t\,dW_t,\qquad \Lambda_T=U'(L_T)\nabla_zL_T,\qquad R_t=\lambda_{y,t}/\lambda_{x,t}`],
+    true,
+  );
+  appendBsde(
+    '[data-paper-equations="constraints"] .eq-card:nth-child(2) .eq-body',
+    "First- and second-order adjoint BSDEs",
+    [
+      String.raw`-d\lambda_t=\partial_x H_t\,dt-Z_t^{\top}dW_t,\qquad \lambda_T=Ke^{-\rho T}U'(X_T)`,
+      String.raw`-dP_t=\bigl[\partial_{xx}H_t+2b_{x,t}P_t+\|\sigma_{x,t}\|^2P_t+2\sigma_{x,t}^{\top}R_t\bigr]dt-R_t^{\top}dW_t,\quad P_T=Ke^{-\rho T}U''(X_T)`,
+    ],
+    true,
+  );
+  appendBsde(
+    '[data-paper-equations="nonexp"] .eq-card:nth-child(2) .eq-body',
+    "Anchored adjoint BSDE",
+    [String.raw`-d\lambda_t^{t_0}=\partial_xH\!\left(t_0,t,X_t,u_t,\lambda_t^{t_0},Z_t^{t_0}\right)dt-Z_t^{t_0}dW_t,\qquad \lambda_T^{t_0}=D(t_0,T)\nabla g(X_T)`],
+    true,
+  );
+
   const state = { mode: "core", warmup: 0, stageIndex: 0, stageTimer: 0, playing: false, lastTimestamp: 0 };
   const drawers = {};
 
@@ -195,7 +266,8 @@
     }
   }));
   els.play?.addEventListener("click", restart); els.reset?.addEventListener("click", reset);
-  window.addEventListener("resize", drawActive); window.addEventListener("pgdpo:ready", drawActive);
+  window.addEventListener("resize", drawActive);
+  window.addEventListener("pgdpo:ready", () => { drawActive(); typeset(); });
 
   const p = new URLSearchParams(location.search), example = p.get("example"), legacy = p.get("mode");
   const initial = example === "constraints" || legacy === "constraints" ? "constraints" :
