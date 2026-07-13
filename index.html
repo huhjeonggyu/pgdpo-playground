@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="PG-DPO in three figures: shared rollout and costate estimation, followed by either smooth control recovery or a transaction-cost dead-zone projection."
+      content="PG-DPO in three figures: shared rollout and costate estimation, followed by smooth control recovery or a transaction-cost dead-zone projection."
     />
     <title>PG-DPO Playground</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="local-corrections.css" />
     <script>
       window.MathJax = {
         tex: {
@@ -52,9 +53,9 @@
               <h2>Warm-up</h2>
             </div>
           </div>
-          <canvas id="fsdeCanvas" width="520" height="190" aria-label="Forward simulation paths"></canvas>
-          <canvas id="trainCanvas" width="520" height="150" aria-label="Policy network warm-up"></canvas>
-          <p class="caption">Stage 1 trains a feasible continuation policy by simulation. The same rollout graph is later differentiated by BPTT.</p>
+          <canvas id="fsdeCanvas" width="520" height="190" aria-label="Forward FSDE paths"></canvas>
+          <canvas id="trainCanvas" width="520" height="150" aria-label="Policy network training"></canvas>
+          <p class="caption">Stage 1 trains a feasible continuation policy by simulation. BPTT through the same rollout later provides costate information.</p>
         </article>
 
         <article class="figure-card figure-card-wide">
@@ -65,8 +66,8 @@
             </div>
           </div>
           <div class="figure2-stack">
-            <canvas id="costateCanvas" width="520" height="188" aria-label="Backward pathwise costate estimation"></canvas>
-            <canvas id="lambdaConvCanvas" width="520" height="72" aria-label="Costate signal convergence"></canvas>
+            <canvas id="costateCanvas" width="520" height="188" aria-label="Backward costate estimation"></canvas>
+            <canvas id="lambdaConvCanvas" width="520" height="72" aria-label="Lambda convergence"></canvas>
           </div>
           <p class="caption">Stage 2 averages pathwise BPTT sensitivities to obtain a local marginal-value signal at the query state.</p>
         </article>
@@ -78,83 +79,121 @@
               <h2 id="recoveryTitle" aria-live="polite">Smooth control recovery</h2>
             </div>
             <div class="mode-switch" role="group" aria-label="Choose local correction example">
-              <button
-                class="mode-button is-active"
-                type="button"
-                data-recovery-mode="smooth"
-                aria-pressed="true"
-                title="Smooth frictionless Merton correction"
-              >Smooth</button>
-              <button
-                class="mode-button"
-                type="button"
-                data-recovery-mode="transaction"
-                aria-pressed="false"
-                title="Transaction-cost dead-zone projection"
-              >Transaction costs</button>
+              <button class="mode-button is-active" type="button" data-recovery-mode="smooth" aria-pressed="true">Smooth</button>
+              <button class="mode-button" type="button" data-recovery-mode="transaction" aria-pressed="false">Transaction costs</button>
             </div>
           </div>
 
-          <canvas id="recoveryCanvas" width="520" height="190" aria-label="Local correction"></canvas>
-
-          <div class="track-wrap compact single">
-            <div class="track-card">
-              <div class="track-label-row">
-                <span id="recoveryTrackLabel">Risky weight $\hat{\pi}$</span>
-                <span class="track-value-wrap">
-                  <span id="recoveryEstimateText">$\hat{\pi}=0.280$</span>
-                  <span id="recoveryRegimeBadge" class="regime-badge" hidden></span>
-                </span>
-              </div>
-              <div id="recoveryTrack" class="track" data-mode="smooth">
-                <div id="recoveryHoldZone" class="track-zone" hidden></div>
-                <div id="recoveryLowerBoundary" class="track-boundary" hidden></div>
-                <div id="recoveryUpperBoundary" class="track-boundary" hidden></div>
-                <div id="recoveryTargetMarker" class="track-target"></div>
-                <div id="recoveryDot" class="track-dot"></div>
-              </div>
-              <div class="track-foot track-foot-three">
-                <span id="recoveryFootLeft">start 0.280</span>
-                <span id="recoveryFootCenter"></span>
-                <span id="recoveryFootRight">critical point 0.750</span>
+          <div data-recovery-panel="smooth">
+            <canvas id="hamiltonianCanvas" width="520" height="190" aria-label="Hamiltonian maximization and control recovery"></canvas>
+            <div class="track-wrap compact single">
+              <div class="track-card">
+                <div class="track-label-row">
+                  <span>Risky weight $\hat{\pi}$</span>
+                  <span id="piEstimateText">$\hat{\pi}=0.280$</span>
+                </div>
+                <div class="track">
+                  <div class="track-target" id="piTargetMarker"></div>
+                  <div class="track-dot" id="piDot"></div>
+                </div>
+                <div class="track-foot">
+                  <span id="piStartText">start 0.280</span>
+                  <span id="piStarText">critical point 0.750</span>
+                </div>
               </div>
             </div>
+            <canvas id="piConvCanvas" width="520" height="100" aria-label="Pi convergence"></canvas>
+            <p class="caption">As $\hat{\lambda}_{t_0}$ improves, $\hat{\pi}$ moves toward the Hamiltonian critical point.</p>
           </div>
 
-          <canvas id="recoveryConvCanvas" width="520" height="100" aria-label="Recovered quantity convergence"></canvas>
-          <p id="recoveryCaption" class="caption">As the costate estimate improves, the recovered risky weight moves toward the Hamiltonian critical point.</p>
+          <div data-recovery-panel="transaction" hidden>
+            <canvas id="tcProjectionCanvas" width="520" height="190" aria-label="Transaction-cost dead-zone projection"></canvas>
+            <div class="track-wrap compact single">
+              <div class="track-card">
+                <div class="track-label-row">
+                  <span>Costate ratio $\hat R=\hat\lambda_y/\hat\lambda_x$</span>
+                  <span class="track-value-wrap">
+                    <span id="tcEstimateText">$\hat R=1.085$</span>
+                    <span id="tcRegimeBadge" class="regime-badge" data-regime="buy">BUY</span>
+                  </span>
+                </div>
+                <div id="tcTrack" class="track tc-track">
+                  <div id="tcHoldZone" class="tc-hold-zone"></div>
+                  <div id="tcLowerBoundary" class="tc-boundary"></div>
+                  <div id="tcUpperBoundary" class="tc-boundary"></div>
+                  <div id="tcTargetMarker" class="track-target"></div>
+                  <div id="tcDot" class="track-dot" data-regime="buy"></div>
+                </div>
+                <div class="track-foot track-foot-three">
+                  <span id="tcFootLeft">sell</span>
+                  <span id="tcFootCenter">hold</span>
+                  <span id="tcFootRight">buy</span>
+                </div>
+              </div>
+            </div>
+            <canvas id="tcConvergenceCanvas" width="520" height="100" aria-label="Costate-ratio convergence"></canvas>
+            <p class="caption">The costate ratio selects buy, hold, or sell. Across a state domain, the local hold classifications trace the no-trade region.</p>
+          </div>
         </article>
       </section>
 
-      <section class="equation-row" aria-label="Mode-specific equations">
+      <section class="equation-row" data-recovery-equations="smooth">
         <article class="eq-card">
-          <h3 id="eq1Title">Model and objective</h3>
-          <div id="eq1Body" class="eq-body eq-body-block">
+          <h3>Model and objective</h3>
+          <div class="eq-body eq-body-block">
             <div>$$dX_t = X_t\bigl(r + \pi_t(\mu-r)\bigr)dt + X_t\pi_t\sigma\,dW_t - c_t\,dt$$</div>
             <div>$$U(x)=\frac{x^{1-\gamma}}{1-\gamma},\qquad \max_{(\pi,c)} \mathbb{E}\left[U(X_T)\right]$$</div>
           </div>
         </article>
         <article class="eq-card">
-          <h3 id="eq2Title">Hamiltonian</h3>
-          <div id="eq2Body" class="eq-body eq-body-block">
+          <h3>Hamiltonian</h3>
+          <div class="eq-body eq-body-block">
             <div>$$H(x,\pi,\lambda)=\lambda x\bigl(r+\pi(\mu-r)\bigr)-\frac{1}{2}\gamma\lambda x\sigma^2\pi^2$$</div>
           </div>
         </article>
         <article class="eq-card">
-          <h3 id="eq3Title">Recovered control</h3>
-          <div id="eq3Body" class="eq-body eq-body-block">
+          <h3>Recovered control</h3>
+          <div class="eq-body eq-body-block">
             <div>$$\hat{\pi}_t=-\frac{\hat{\lambda}_t}{X_t\,\partial_x\hat{\lambda}_t}\,\frac{\mu-r}{\sigma^2}$$</div>
           </div>
         </article>
       </section>
 
+      <section class="equation-row" data-recovery-equations="transaction" hidden>
+        <article class="eq-card">
+          <h3>State and liquidation wealth</h3>
+          <div class="eq-body eq-body-block">
+            <div>$$Z_t=(X_t,Y_t),\qquad L_t=X_t+(1-\alpha)Y_t$$</div>
+            <div>$$U(\ell)=\frac{\ell^{1-\gamma}}{1-\gamma},\qquad \max_u\mathbb{E}\left[U(L_T)\right]$$</div>
+          </div>
+        </article>
+        <article class="eq-card">
+          <h3>Nonsmooth local Hamiltonian</h3>
+          <div class="eq-body eq-body-block">
+            <div>$$H(u;\lambda)=L_t\left[-\lambda_xu^+ +(1-\alpha)\lambda_xu^-+\lambda_yu\right]$$</div>
+            <div>$$H^{\varepsilon}(u;\lambda)=H(u;\lambda)-\frac{\varepsilon}{2}L_t\lambda_xu^2$$</div>
+          </div>
+        </article>
+        <article class="eq-card">
+          <h3>Dead-zone projection</h3>
+          <div class="eq-body eq-body-block tc-equation-dense">
+            <div>$$R=\frac{\lambda_y}{\lambda_x},\qquad P_\varepsilon(R)=\begin{cases}
+              \dfrac{R-1}{\varepsilon},&R>1,\\[2pt]
+              0,&1-\alpha\le R\le1,\\[2pt]
+              \dfrac{R-(1-\alpha)}{\varepsilon},&R<1-\alpha.
+            \end{cases}$$</div>
+          </div>
+        </article>
+      </section>
+
       <section class="note-card">
-        <p><strong>Shared pipeline.</strong> Figures 1 and 2 stay fixed. Figure 3 switches only the local costate-to-action map: a smooth first-order condition or a transaction-cost dead-zone projection.</p>
-        <p><strong>Scope.</strong> The page illustrates one query point. Repeating the local correction over a state domain produces a feedback policy; in transaction-cost problems, the hold classifications trace the no-trade region.</p>
-        <p><strong>References.</strong> <a href="docs/transaction-costs.md">Transaction-cost note</a> · <a href="references/recovering-no-trade-regions-aqfc-2026.md">AQFC 2026 reference note</a> · <span>Curves are schematic rather than live training output.</span></p>
+        <p><strong>Shared pipeline.</strong> Figures 1 and 2 stay fixed. Figure 3 switches only the local costate-to-action map.</p>
+        <p><strong>Scope.</strong> This page illustrates one query point. The transaction-cost convergence curve is schematic rather than live training output.</p>
+        <p><strong>References.</strong> <a href="docs/transaction-costs.md">Transaction-cost note</a> · <a href="references/recovering-no-trade-regions-aqfc-2026.md">AQFC 2026 reference note</a></p>
       </section>
     </main>
 
-    <script type="module" src="app.js"></script>
+    <script src="app.js"></script>
+    <script src="local-corrections.js"></script>
   </body>
 </html>
