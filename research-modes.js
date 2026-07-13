@@ -59,28 +59,66 @@
     style.textContent = `
       .adjoint-bsde-block {
         width: 100%;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid rgba(255,255,255,0.08);
+        margin-top: 12px;
+        padding: 12px 2px 7px;
+        border-top: 1px solid rgba(255,255,255,0.10);
+        font-size: 1rem;
       }
       .adjoint-bsde-label {
-        margin-bottom: 3px;
-        color: rgba(168,199,255,0.82);
-        font-size: 0.60rem;
-        font-weight: 800;
+        margin-bottom: 7px;
+        color: rgba(168,199,255,0.88);
+        font-size: 0.72rem;
+        font-weight: 850;
         letter-spacing: 0.10em;
+        line-height: 1.25;
         text-transform: uppercase;
       }
+      .adjoint-bsde-block > div:not(.adjoint-bsde-label) + div {
+        margin-top: 5px;
+      }
       .adjoint-bsde-block mjx-container {
-        margin: 0.18em 0 !important;
-        font-size: 68% !important;
+        margin: 0.34em 0 !important;
+        font-size: 92% !important;
+      }
+      .adjoint-bsde-block.is-dense {
+        padding-top: 13px;
+        padding-bottom: 9px;
+        font-size: 0.96rem;
       }
       .adjoint-bsde-block.is-dense mjx-container {
-        font-size: 57% !important;
+        font-size: 86% !important;
+      }
+      .bptt-overlay-wrap {
+        position: relative;
+        width: 100%;
+        min-width: 0;
+      }
+      .bptt-overlay-wrap > canvas:first-child {
+        position: relative;
+        z-index: 1;
+      }
+      canvas.bptt-glow-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        width: 100% !important;
+        height: 100% !important;
+        pointer-events: none;
+        border: 0 !important;
+        border-radius: 16px;
+        background: transparent !important;
+        box-shadow: none !important;
       }
       @media (max-width: 700px) {
-        .adjoint-bsde-block mjx-container { font-size: 62% !important; }
-        .adjoint-bsde-block.is-dense mjx-container { font-size: 52% !important; }
+        .adjoint-bsde-block {
+          margin-top: 10px;
+          padding: 10px 0 6px;
+          font-size: 0.92rem;
+        }
+        .adjoint-bsde-label { font-size: 0.66rem; }
+        .adjoint-bsde-block mjx-container { font-size: 90% !important; }
+        .adjoint-bsde-block.is-dense { font-size: 0.90rem; }
+        .adjoint-bsde-block.is-dense mjx-container { font-size: 82% !important; }
       }
     `;
     document.head.appendChild(style);
@@ -98,27 +136,27 @@
   appendBsde(
     '[data-recovery-equations="smooth"] .eq-card:nth-child(2) .eq-body',
     "Adjoint BSDE",
-    [String.raw`-d\lambda_t=\partial_x H_t\,dt-Z_t\,dW_t,\qquad \lambda_T=U'(X_T)`],
+    [String.raw`\begin{aligned}-d\lambda_t&=\partial_x H_t\,dt-Z_t\,dW_t,\\ \lambda_T&=U'(X_T).\end{aligned}`],
   );
   appendBsde(
     '[data-recovery-equations="transaction"] .eq-card:nth-child(2) .eq-body',
     "Vector adjoint BSDE",
-    [String.raw`-d\Lambda_t=\nabla_z H_t\,dt-\mathcal M_t\,dW_t,\qquad \Lambda_T=U'(L_T)\nabla_zL_T,\qquad R_t=\lambda_{y,t}/\lambda_{x,t}`],
+    [String.raw`\begin{aligned}-d\Lambda_t&=\nabla_z H_t\,dt-\mathcal M_t\,dW_t,\\ \Lambda_T&=U'(L_T)\nabla_zL_T,\qquad R_t=\frac{\lambda_{y,t}}{\lambda_{x,t}}.\end{aligned}`],
     true,
   );
   appendBsde(
     '[data-paper-equations="constraints"] .eq-card:nth-child(2) .eq-body',
     "First- and second-order adjoint BSDEs",
     [
-      String.raw`-d\lambda_t=\partial_x H_t\,dt-Z_t^{\top}dW_t,\qquad \lambda_T=Ke^{-\rho T}U'(X_T)`,
-      String.raw`-dP_t=\bigl[\partial_{xx}H_t+2b_{x,t}P_t+\|\sigma_{x,t}\|^2P_t+2\sigma_{x,t}^{\top}R_t\bigr]dt-R_t^{\top}dW_t,\quad P_T=Ke^{-\rho T}U''(X_T)`,
+      String.raw`\begin{aligned}-d\lambda_t&=\partial_x H_t\,dt-Z_t^{\top}dW_t,\\ \lambda_T&=Ke^{-\rho T}U'(X_T).\end{aligned}`,
+      String.raw`\begin{aligned}-dP_t&=\Big[\partial_{xx}H_t+2b_{x,t}P_t+\|\sigma_{x,t}\|^2P_t\\ &\qquad\quad+2\sigma_{x,t}^{\top}R_t\Big]dt-R_t^{\top}dW_t,\\ P_T&=Ke^{-\rho T}U''(X_T).\end{aligned}`,
     ],
     true,
   );
   appendBsde(
     '[data-paper-equations="nonexp"] .eq-card:nth-child(2) .eq-body',
     "Anchored adjoint BSDE",
-    [String.raw`-d\lambda_t^{t_0}=\partial_xH\!\left(t_0,t,X_t,u_t,\lambda_t^{t_0},Z_t^{t_0}\right)dt-Z_t^{t_0}dW_t,\qquad \lambda_T^{t_0}=D(t_0,T)\nabla g(X_T)`],
+    [String.raw`\begin{aligned}-d\lambda_t^{t_0}&=\partial_xH\!\left(t_0,t,X_t,u_t,\lambda_t^{t_0},Z_t^{t_0}\right)dt-Z_t^{t_0}dW_t,\\ \lambda_T^{t_0}&=D(t_0,T)\nabla g(X_T).\end{aligned}`],
     true,
   );
 
@@ -212,6 +250,177 @@
     ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.stroke();
   }
 
+  function installOverlay(baseCanvas, id) {
+    if (!baseCanvas) return null;
+    const existing = document.getElementById(id);
+    if (existing) return { base: baseCanvas, overlay: existing };
+    const wrapper = document.createElement("div");
+    wrapper.className = "bptt-overlay-wrap";
+    baseCanvas.parentNode.insertBefore(wrapper, baseCanvas);
+    wrapper.appendChild(baseCanvas);
+    const overlay = document.createElement("canvas");
+    overlay.id = id;
+    overlay.className = "bptt-glow-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    wrapper.appendChild(overlay);
+    return { base: baseCanvas, overlay };
+  }
+
+  function setupOverlay(target) {
+    if (!target?.base || !target?.overlay) return { ctx: null, width: 0, height: 0 };
+    const rect = target.base.getBoundingClientRect();
+    const width = rect.width, height = rect.height;
+    const dpr = window.devicePixelRatio || 1;
+    const ctx = target.overlay.getContext("2d");
+    if (!ctx || width < 2 || height < 2) return { ctx, width: 0, height: 0 };
+    const pw = Math.max(1, Math.round(width * dpr));
+    const ph = Math.max(1, Math.round(height * dpr));
+    if (target.overlay.width !== pw || target.overlay.height !== ph) {
+      target.overlay.width = pw;
+      target.overlay.height = ph;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    return { ctx, width, height };
+  }
+
+  function rgba(color, alpha) {
+    return color.replace(/,\s*1\)$/, `,${alpha})`);
+  }
+
+  function drawBackwardSweep(ctx, path, xScale, yScale, start, phase, color, lineWidth = 3.1) {
+    const span = Math.max(1e-6, 1 - start);
+    const front = 1 - clamp(phase, 0, 1) * span;
+    const tail = Math.min(1, front + 0.28 * span);
+    const samples = 42;
+
+    ctx.save();
+    ctx.shadowBlur = 17;
+    ctx.shadowColor = rgba(color, 0.95);
+    ctx.beginPath();
+    for (let i = 0; i <= samples; i += 1) {
+      const t = tail - (tail - front) * i / samples;
+      const x = xScale(t), y = yScale(path(t));
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = rgba(color, 0.93);
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+
+    const fx = xScale(front), fy = yScale(path(front));
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.012);
+    ctx.beginPath();
+    ctx.fillStyle = rgba(COLORS.yellow, 0.78 + 0.18 * pulse);
+    ctx.arc(fx, fy, 3.4 + 1.2 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    for (let j = 0; j < 3; j += 1) {
+      const drift = 7 + j * 6;
+      ctx.beginPath();
+      ctx.fillStyle = rgba(color, 0.48 - 0.10 * j);
+      ctx.arc(fx + drift, fy + Math.sin(performance.now() * 0.006 + j) * 2.2, 2.1 - 0.35 * j, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  const overlayTargets = {
+    constraints: installOverlay(document.getElementById("constraintAdjointCanvas"), "constraintBpttGlowCanvas"),
+    nonexp: installOverlay(document.getElementById("nonexpAdjointCanvas"), "nonexpBpttGlowCanvas"),
+  };
+
+  function bpttIsActive(mode) {
+    return state.mode === mode && state.playing && state.warmup >= 0.999 && state.stageIndex < stageCounts.length;
+  }
+
+  function drawConstraintBpttGlow() {
+    const target = overlayTargets.constraints;
+    const { ctx, width, height } = setupOverlay(target);
+    if (!ctx || !bpttIsActive("constraints")) return;
+
+    const left = 42, right = 14, top = 20, bottom = 18, gap = 16;
+    const panelHeight = (height - top - bottom - gap) / 2;
+    const xScale = (t) => left + t * (width - left - right);
+    const clock = performance.now() * 0.00072;
+    const panels = [
+      {
+        top,
+        height: panelHeight,
+        color: COLORS.orange,
+        base: (t) => 1.18 - 0.36 * t + 0.04 * Math.sin(5.3 * t),
+        min: 0.72,
+        max: 1.28,
+        offset: 0,
+      },
+      {
+        top: top + panelHeight + gap,
+        height: panelHeight,
+        color: COLORS.blue,
+        base: (t) => 1.72 - 0.58 * t + 0.06 * Math.cos(4.6 * t + 0.4),
+        min: 1.02,
+        max: 1.90,
+        offset: 0.27,
+      },
+    ];
+
+    panels.forEach((panel, panelIndex) => {
+      const yScale = (v) => panel.top + panel.height - (v - panel.min) / (panel.max - panel.min) * panel.height;
+      for (let j = 0; j < 3; j += 1) {
+        const phase = (clock + panel.offset + j * 0.19) % 1;
+        const path = (t) => panel.base(t) + (0.018 + 0.006 * j) * Math.sin(8.5 * t + 0.9 * j + panelIndex) * (1 - 0.35 * t);
+        drawBackwardSweep(ctx, path, xScale, yScale, 0, phase, panel.color, j === 0 ? 3.2 : 2.0);
+      }
+    });
+
+    ctx.fillStyle = rgba(COLORS.yellow, 0.92);
+    ctx.font = "bold 10px Inter,system-ui,sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("BPTT backward sweep:  t₀  ←  T", left, 14);
+  }
+
+  function nonexpMean(anchor, t) {
+    if (t < anchor) return NaN;
+    const s = (t - anchor) / Math.max(1e-6, 1 - anchor);
+    return 1.30 - 0.42 * s + 0.10 * anchor + 0.035 * Math.sin(4.8 * s + 1.2 * anchor);
+  }
+
+  function drawNonexpBpttGlow() {
+    const target = overlayTargets.nonexp;
+    const { ctx, width, height } = setupOverlay(target);
+    if (!ctx || !bpttIsActive("nonexp")) return;
+
+    const pad = { left: 44, right: 18, top: 35, bottom: 30 };
+    const xScale = (t) => pad.left + t * (width - pad.left - pad.right);
+    const yScale = (v) => height - pad.bottom - (v - 0.78) / 0.64 * (height - pad.top - pad.bottom);
+    const anchors = [
+      { t: 0.18, color: COLORS.blue, offset: 0 },
+      { t: 0.50, color: COLORS.orange, offset: 0.24 },
+      { t: 0.82, color: COLORS.purple, offset: 0.48 },
+    ];
+    const clock = performance.now() * 0.00068;
+
+    anchors.forEach((q, ai) => {
+      for (let j = 0; j < 3; j += 1) {
+        const phase = (clock + q.offset + j * 0.17) % 1;
+        const path = (t) => {
+          const s = (t - q.t) / Math.max(1e-6, 1 - q.t);
+          return nonexpMean(q.t, t) + (0.014 + 0.005 * j) * Math.sin(9 * s + 0.8 * j + ai) * (1 - 0.4 * s);
+        };
+        drawBackwardSweep(ctx, path, xScale, yScale, q.t, phase, q.color, j === 0 ? 3.2 : 1.9);
+      }
+    });
+
+    ctx.fillStyle = rgba(COLORS.yellow, 0.92);
+    ctx.font = "bold 10px Inter,system-ui,sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("BPTT backward:  t₀  ←  T", width - pad.right, 31);
+    ctx.textAlign = "left";
+  }
+
+  function drawBpttOverlays() {
+    drawConstraintBpttGlow();
+    drawNonexpBpttGlow();
+  }
+
   function drawActive() { if (drawers[state.mode]) drawers[state.mode](); }
   function registerMode(id, draw) { drawers[id] = draw; if (state.mode === id) requestAnimationFrame(draw); }
   function typeset() {
@@ -220,7 +429,7 @@
   }
 
   function restart() { state.warmup = 0; state.stageIndex = 0; state.stageTimer = 0; state.playing = true; }
-  function reset() { state.warmup = 0; state.stageIndex = 0; state.stageTimer = 0; state.playing = false; drawActive(); }
+  function reset() { state.warmup = 0; state.stageIndex = 0; state.stageTimer = 0; state.playing = false; drawActive(); drawBpttOverlays(); }
 
   function setMode(modeId, updateUrl = false) {
     const selected = modeId === "constraints" || modeId === "nonexp" ? modeId : "core";
@@ -234,7 +443,7 @@
       els.buttons.forEach((b) => { const active = b.dataset.paperMode === selected; b.classList.toggle("is-active", active); b.setAttribute("aria-pressed", String(active)); });
       restart();
     }
-    requestAnimationFrame(() => { drawActive(); window.dispatchEvent(new Event("resize")); });
+    requestAnimationFrame(() => { drawActive(); drawBpttOverlays(); window.dispatchEvent(new Event("resize")); });
     typeset();
     if (updateUrl) {
       const url = new URL(window.location.href);
@@ -254,7 +463,9 @@
         if (state.stageTimer >= stageIntervals[state.stageIndex]) { state.stageTimer = 0; state.stageIndex += 1; }
       } else state.playing = false;
     }
-    drawActive(); requestAnimationFrame(animate);
+    drawActive();
+    drawBpttOverlays();
+    requestAnimationFrame(animate);
   }
 
   window.PGDemo = { stageCounts, COLORS, state, clamp, lerp, easeOut, fmt, expFmt, setupCanvas, drawBackground, drawGrid, drawAxes, drawArrow, stageContext, recoveryProgress, visiblePathCount, drawProgressSeries, registerMode };
@@ -266,8 +477,8 @@
     }
   }));
   els.play?.addEventListener("click", restart); els.reset?.addEventListener("click", reset);
-  window.addEventListener("resize", drawActive);
-  window.addEventListener("pgdpo:ready", () => { drawActive(); typeset(); });
+  window.addEventListener("resize", () => { drawActive(); drawBpttOverlays(); });
+  window.addEventListener("pgdpo:ready", () => { drawActive(); drawBpttOverlays(); typeset(); });
 
   const p = new URLSearchParams(location.search), example = p.get("example"), legacy = p.get("mode");
   const initial = example === "constraints" || legacy === "constraints" ? "constraints" :
