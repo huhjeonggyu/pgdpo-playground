@@ -1,26 +1,45 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="is-booting">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="PG-DPO in three figures: shared rollout and costate estimation, followed by smooth control recovery or a transaction-cost dead-zone projection."
+      content="PG-DPO in three stages: warm-up, costate estimation, and local correction through a smooth Hamiltonian condition or a transaction-cost dead-zone projection."
     />
     <title>PG-DPO Playground</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="local-corrections.css" />
     <script>
+      const revealPlayground = () => {
+        const root = document.documentElement;
+        if (!root.classList.contains('is-booting')) return;
+        root.classList.remove('is-booting');
+        root.classList.add('is-ready');
+        window.requestAnimationFrame(() => {
+          window.dispatchEvent(new Event('resize'));
+          window.dispatchEvent(new Event('pgdpo:ready'));
+        });
+      };
+      window.revealPlayground = revealPlayground;
+      window.setTimeout(revealPlayground, 1800);
       window.MathJax = {
         tex: {
           inlineMath: [['$', '$'], ['\\(', '\\)']],
           displayMath: [['$$','$$'], ['\\[','\\]']]
         },
-        svg: { fontCache: 'global' }
+        svg: { fontCache: 'global' },
+        startup: {
+          ready: () => {
+            MathJax.startup.defaultReady();
+            MathJax.startup.promise.then(revealPlayground).catch(revealPlayground);
+          }
+        }
       };
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <noscript><style>html.is-booting body { visibility: visible !important; }</style></noscript>
   </head>
   <body>
     <main class="page-shell">
@@ -41,7 +60,11 @@
         </div>
         <div class="stage-panel stage-panel-2">
           <span class="stage-badge stage-badge-2">Stage 2</span>
-          <span class="stage-text">Costate estimation and local correction</span>
+          <span class="stage-text">Costate estimation</span>
+        </div>
+        <div class="stage-panel stage-panel-3">
+          <span class="stage-badge stage-badge-3">Stage 3</span>
+          <span class="stage-text">Local correction</span>
         </div>
       </section>
 
@@ -69,7 +92,7 @@
             <canvas id="costateCanvas" width="520" height="188" aria-label="Backward costate estimation"></canvas>
             <canvas id="lambdaConvCanvas" width="520" height="72" aria-label="Lambda convergence"></canvas>
           </div>
-          <p class="caption">Stage 2 averages pathwise BPTT sensitivities to obtain a local marginal-value signal at the query state.</p>
+          <p class="caption">Stage 2 averages pathwise BPTT sensitivities to obtain local marginal-value signals at queried states.</p>
         </article>
 
         <article class="figure-card recovery-card">
@@ -84,112 +107,121 @@
             </div>
           </div>
 
-          <div data-recovery-panel="smooth">
-            <canvas id="hamiltonianCanvas" width="520" height="190" aria-label="Hamiltonian maximization and control recovery"></canvas>
-            <div class="track-wrap compact single">
-              <div class="track-card">
-                <div class="track-label-row">
-                  <span>Risky weight $\hat{\pi}$</span>
-                  <span id="piEstimateText">$\hat{\pi}=0.280$</span>
-                </div>
-                <div class="track">
-                  <div class="track-target" id="piTargetMarker"></div>
-                  <div class="track-dot" id="piDot"></div>
-                </div>
-                <div class="track-foot">
-                  <span id="piStartText">start 0.280</span>
-                  <span id="piStarText">critical point 0.750</span>
-                </div>
-              </div>
-            </div>
-            <canvas id="piConvCanvas" width="520" height="100" aria-label="Pi convergence"></canvas>
-            <p class="caption">As $\hat{\lambda}_{t_0}$ improves, $\hat{\pi}$ moves toward the Hamiltonian critical point.</p>
-          </div>
-
-          <div data-recovery-panel="transaction" hidden>
-            <canvas id="tcProjectionCanvas" width="520" height="190" aria-label="Transaction-cost dead-zone projection"></canvas>
-            <div class="track-wrap compact single">
-              <div class="track-card">
-                <div class="track-label-row">
-                  <span>Costate ratio $\hat R=\hat\lambda_y/\hat\lambda_x$</span>
-                  <span class="track-value-wrap">
-                    <span id="tcEstimateText">$\hat R=1.085$</span>
-                    <span id="tcRegimeBadge" class="regime-badge" data-regime="buy">BUY</span>
-                  </span>
-                </div>
-                <div id="tcTrack" class="track tc-track">
-                  <div id="tcHoldZone" class="tc-hold-zone"></div>
-                  <div id="tcLowerBoundary" class="tc-boundary"></div>
-                  <div id="tcUpperBoundary" class="tc-boundary"></div>
-                  <div id="tcTargetMarker" class="track-target"></div>
-                  <div id="tcDot" class="track-dot" data-regime="buy"></div>
-                </div>
-                <div class="track-foot track-foot-three">
-                  <span id="tcFootLeft">sell</span>
-                  <span id="tcFootCenter">hold</span>
-                  <span id="tcFootRight">buy</span>
+          <div class="recovery-panel-stack">
+            <div data-recovery-panel="smooth">
+              <canvas id="hamiltonianCanvas" width="520" height="190" aria-label="Hamiltonian maximization and control recovery"></canvas>
+              <div class="track-wrap compact single">
+                <div class="track-card">
+                  <div class="track-label-row">
+                    <span>Risky weight $\hat{\pi}$</span>
+                    <span id="piEstimateText">$\hat{\pi}=0.280$</span>
+                  </div>
+                  <div class="track">
+                    <div class="track-target" id="piTargetMarker"></div>
+                    <div class="track-dot" id="piDot"></div>
+                  </div>
+                  <div class="track-foot">
+                    <span id="piStartText">start 0.280</span>
+                    <span id="piStarText">critical point 0.750</span>
+                  </div>
                 </div>
               </div>
+              <canvas id="piConvCanvas" width="520" height="100" aria-label="Pi convergence"></canvas>
+              <p class="caption">As $\hat{\lambda}_{t_0}$ improves, $\hat{\pi}$ moves toward the Hamiltonian critical point.</p>
             </div>
-            <canvas id="tcConvergenceCanvas" width="520" height="100" aria-label="Costate-ratio convergence"></canvas>
-            <p class="caption">The costate ratio selects buy, hold, or sell. Across a state domain, the local hold classifications trace the no-trade region.</p>
+
+            <div data-recovery-panel="transaction" hidden>
+              <canvas id="tcProjectionCanvas" width="520" height="190" aria-label="Transaction-cost dead-zone projection for three representative query points"></canvas>
+              <section class="tc-query-panel" aria-label="Representative transaction-cost query points">
+                <div class="tc-query-panel-head">
+                  <span>Representative query points</span>
+                  <span>R̂ → Pε(R̂)</span>
+                </div>
+                <div class="tc-query-grid">
+                  <div id="tcSellCard" class="tc-query-card" data-regime="sell">
+                    <div class="tc-query-card-head">
+                      <span class="tc-query-label"><span class="tc-query-swatch tc-query-swatch-sell"></span>Query S</span>
+                      <span id="tcSellRegimeBadge" class="regime-badge" data-regime="sell">SELL</span>
+                    </div>
+                    <div id="tcSellEstimateText" class="tc-query-value">R̂ = 0.875 · û = -0.139</div>
+                  </div>
+                  <div id="tcHoldCard" class="tc-query-card" data-regime="hold">
+                    <div class="tc-query-card-head">
+                      <span class="tc-query-label"><span class="tc-query-swatch tc-query-swatch-hold"></span>Query H</span>
+                      <span id="tcHoldRegimeBadge" class="regime-badge" data-regime="hold">HOLD</span>
+                    </div>
+                    <div id="tcHoldEstimateText" class="tc-query-value">R̂ = 0.980 · û = 0.000</div>
+                  </div>
+                  <div id="tcBuyCard" class="tc-query-card" data-regime="buy">
+                    <div class="tc-query-card-head">
+                      <span class="tc-query-label"><span class="tc-query-swatch tc-query-swatch-buy"></span>Query B</span>
+                      <span id="tcBuyRegimeBadge" class="regime-badge" data-regime="buy">BUY</span>
+                    </div>
+                    <div id="tcBuyEstimateText" class="tc-query-value">R̂ = 1.035 · û = 0.194</div>
+                  </div>
+                </div>
+              </section>
+              <canvas id="tcConvergenceCanvas" width="520" height="108" aria-label="Costate-ratio convergence for sell, hold, and buy query points"></canvas>
+              <p class="caption">Three representative query states converge to sell, hold, and buy regimes under the same costate-ratio projection.</p>
+            </div>
           </div>
         </article>
       </section>
 
-      <section class="equation-row" data-recovery-equations="smooth">
-        <article class="eq-card">
-          <h3>Model and objective</h3>
-          <div class="eq-body eq-body-block">
-            <div>$$dX_t = X_t\bigl(r + \pi_t(\mu-r)\bigr)dt + X_t\pi_t\sigma\,dW_t - c_t\,dt$$</div>
-            <div>$$U(x)=\frac{x^{1-\gamma}}{1-\gamma},\qquad \max_{(\pi,c)} \mathbb{E}\left[U(X_T)\right]$$</div>
-          </div>
-        </article>
-        <article class="eq-card">
-          <h3>Hamiltonian</h3>
-          <div class="eq-body eq-body-block">
-            <div>$$H(x,\pi,\lambda)=\lambda x\bigl(r+\pi(\mu-r)\bigr)-\frac{1}{2}\gamma\lambda x\sigma^2\pi^2$$</div>
-          </div>
-        </article>
-        <article class="eq-card">
-          <h3>Recovered control</h3>
-          <div class="eq-body eq-body-block">
-            <div>$$\hat{\pi}_t=-\frac{\hat{\lambda}_t}{X_t\,\partial_x\hat{\lambda}_t}\,\frac{\mu-r}{\sigma^2}$$</div>
-          </div>
-        </article>
-      </section>
+      <div class="equation-stack">
+        <section class="equation-row" data-recovery-equations="smooth">
+          <article class="eq-card">
+            <h3>Model and objective</h3>
+            <div class="eq-body eq-body-block">
+              <div>$$dX_t = X_t\bigl(r + \pi_t(\mu-r)\bigr)dt + X_t\pi_t\sigma\,dW_t - c_t\,dt$$</div>
+              <div>$$U(x)=\frac{x^{1-\gamma}}{1-\gamma},\qquad \max_{(\pi,c)} \mathbb{E}\left[U(X_T)\right]$$</div>
+            </div>
+          </article>
+          <article class="eq-card">
+            <h3>Hamiltonian</h3>
+            <div class="eq-body eq-body-block">
+              <div>$$H(x,\pi,\lambda)=\lambda x\bigl(r+\pi(\mu-r)\bigr)-\frac{1}{2}\gamma\lambda x\sigma^2\pi^2$$</div>
+            </div>
+          </article>
+          <article class="eq-card">
+            <h3>Recovered control</h3>
+            <div class="eq-body eq-body-block">
+              <div>$$\hat{\pi}_t=-\frac{\hat{\lambda}_t}{X_t\,\partial_x\hat{\lambda}_t}\,\frac{\mu-r}{\sigma^2}$$</div>
+            </div>
+          </article>
+        </section>
 
-      <section class="equation-row" data-recovery-equations="transaction" hidden>
-        <article class="eq-card">
-          <h3>State and liquidation wealth</h3>
-          <div class="eq-body eq-body-block">
-            <div>$$Z_t=(X_t,Y_t),\qquad L_t=X_t+(1-\alpha)Y_t$$</div>
-            <div>$$U(\ell)=\frac{\ell^{1-\gamma}}{1-\gamma},\qquad \max_u\mathbb{E}\left[U(L_T)\right]$$</div>
-          </div>
-        </article>
-        <article class="eq-card">
-          <h3>Nonsmooth local Hamiltonian</h3>
-          <div class="eq-body eq-body-block">
-            <div>$$H(u;\lambda)=L_t\left[-\lambda_xu^+ +(1-\alpha)\lambda_xu^-+\lambda_yu\right]$$</div>
-            <div>$$H^{\varepsilon}(u;\lambda)=H(u;\lambda)-\frac{\varepsilon}{2}L_t\lambda_xu^2$$</div>
-          </div>
-        </article>
-        <article class="eq-card">
-          <h3>Dead-zone projection</h3>
-          <div class="eq-body eq-body-block tc-equation-dense">
-            <div>$$R=\frac{\lambda_y}{\lambda_x},\qquad P_\varepsilon(R)=\begin{cases}
-              \dfrac{R-1}{\varepsilon},&R>1,\\[2pt]
-              0,&1-\alpha\le R\le1,\\[2pt]
-              \dfrac{R-(1-\alpha)}{\varepsilon},&R<1-\alpha.
-            \end{cases}$$</div>
-          </div>
-        </article>
-      </section>
+        <section class="equation-row" data-recovery-equations="transaction" hidden>
+          <article class="eq-card">
+            <h3>State and liquidation wealth</h3>
+            <div class="eq-body eq-body-block">
+              <div>$$Z_t=(X_t,Y_t),\qquad L_t=X_t+(1-\alpha)Y_t$$</div>
+              <div>$$U(\ell)=\frac{\ell^{1-\gamma}}{1-\gamma},\qquad \max_u\mathbb{E}\left[U(L_T)\right]$$</div>
+            </div>
+          </article>
+          <article class="eq-card">
+            <h3>Nonsmooth local Hamiltonian</h3>
+            <div class="eq-body eq-body-block">
+              <div>$$H(u;\lambda)=L_t\left[-\lambda_xu^+ +(1-\alpha)\lambda_xu^-+\lambda_yu\right]$$</div>
+              <div>$$H^{\varepsilon}(u;\lambda)=H(u;\lambda)-\frac{\varepsilon}{2}L_t\lambda_xu^2$$</div>
+            </div>
+          </article>
+          <article class="eq-card">
+            <h3>Dead-zone projection</h3>
+            <div class="eq-body eq-body-block tc-equation-dense">
+              <div>$$R=\frac{\lambda_y}{\lambda_x},\qquad P_\varepsilon(R)=\begin{cases}
+                \dfrac{R-1}{\varepsilon},&R>1,\\[2pt]
+                0,&1-\alpha\le R\le1,\\[2pt]
+                \dfrac{R-(1-\alpha)}{\varepsilon},&R<1-\alpha.
+              \end{cases}$$</div>
+            </div>
+          </article>
+        </section>
+      </div>
 
       <section class="note-card">
         <p><strong>Shared pipeline.</strong> Figures 1 and 2 stay fixed. Figure 3 switches only the local costate-to-action map.</p>
-        <p><strong>Scope.</strong> This page illustrates one query point. The transaction-cost convergence curve is schematic rather than live training output.</p>
-        <p><strong>References.</strong> <a href="docs/transaction-costs.md">Transaction-cost note</a> · <a href="references/recovering-no-trade-regions-aqfc-2026.md">AQFC 2026 reference note</a></p>
+        <p><strong>Scope.</strong> This page illustrates local correction at representative query points; the transaction-cost view includes one sell, one hold, and one buy case. The displayed convergence curves are schematic rather than live training output.</p>
       </section>
     </main>
 
