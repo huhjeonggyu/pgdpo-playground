@@ -259,3 +259,43 @@
 /* The base stylesheet already uses this layout in production; keeping the
    override here makes the paper selector self-contained. */
 .stage-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Give every chart roughly 1.5× more vertical room so the plotted geometry
+   reads naturally instead of looking vertically compressed. */
+#fsdeCanvas,
+#hamiltonianCanvas,
+#tcProjectionCanvas,
+#constraintRolloutCanvas,
+#nonexpKernelCanvas,
+#constraintRecoveryCanvas,
+#nonexpRecoveryCanvas {
+  aspect-ratio: 520 / 285;
+}
+
+#trainCanvas,
+#constraintFeasibleCanvas,
+#nonexpAnchorCanvas {
+  aspect-ratio: 520 / 225;
+}
+
+#costateCanvas,
+#constraintAdjointCanvas,
+#nonexpAdjointCanvas {
+  aspect-ratio: 520 / 282;
+}
+
+#lambdaConvCanvas,
+#constraintAdjointConvCanvas,
+#nonexpDiagonalCanvas {
+  aspect-ratio: 520 / 108;
+}
+
+#piConvCanvas {
+  aspect-ratio: 520 / 150;
+}
+
+#tcConvergenceCanvas,
+#constraintResidualCanvas,
+#nonexpResidualCanvas {
+  aspect-ratio: 520 / 162;
+}
