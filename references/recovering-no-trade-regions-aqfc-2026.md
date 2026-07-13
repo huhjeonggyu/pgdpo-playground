@@ -92,7 +92,7 @@ The sign gives buy, hold, or sell; the magnitude gives trading speed. The no-tra
 
 ## Scope
 
-The playground is an educational one-query-point visualization. Its transaction-cost convergence path is schematic. The research claim is local consistency and regime recovery for the regularized solver, not a global convergence theorem for the limiting singular-control free-boundary problem.
+The playground is an educational representative-query-point visualization. Its transaction-cost view displays one sell, one hold, and one buy query, and its convergence curves are schematic. The research claim is local consistency and regime recovery for the regularized solver, not a global convergence theorem for the limiting singular-control free-boundary problem.
 
 ## Selected references
 
