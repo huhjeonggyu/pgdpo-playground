@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="PG-DPO in three figures: warm-up, costate estimation, and control recovery in the Merton model."
+      content="PG-DPO in three figures: shared rollout and costate estimation, followed by smooth control recovery or a transaction-cost dead-zone projection."
     />
-    <title>PG-DPO</title>
+    <title>PG-DPO Playground</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="local-corrections.css" />
     <script>
       window.MathJax = {
         tex: {
@@ -33,14 +34,14 @@
         </div>
       </header>
 
-      <section class="stage-strip">
+      <section class="stage-strip" aria-label="PG-DPO stages">
         <div class="stage-panel stage-panel-1">
           <span class="stage-badge">Stage 1</span>
           <span class="stage-text">Warm-up</span>
         </div>
         <div class="stage-panel stage-panel-2">
           <span class="stage-badge stage-badge-2">Stage 2</span>
-          <span class="stage-text">Costate estimation and control recovery</span>
+          <span class="stage-text">Costate estimation and local correction</span>
         </div>
       </section>
 
@@ -54,7 +55,7 @@
           </div>
           <canvas id="fsdeCanvas" width="520" height="190" aria-label="Forward FSDE paths"></canvas>
           <canvas id="trainCanvas" width="520" height="150" aria-label="Policy network training"></canvas>
-          <p class="caption">Stage 1 trains a feasible policy network by simulation. BPTT through this rollout later provides costate information.</p>
+          <p class="caption">Stage 1 trains a feasible continuation policy by simulation. BPTT through the same rollout later provides costate information.</p>
         </article>
 
         <article class="figure-card figure-card-wide">
@@ -68,39 +69,75 @@
             <canvas id="costateCanvas" width="520" height="188" aria-label="Backward costate estimation"></canvas>
             <canvas id="lambdaConvCanvas" width="520" height="72" aria-label="Lambda convergence"></canvas>
           </div>
-          <p class="caption">Stage 2 uses BPTT to produce pathwise estimates $\hat{\lambda}^{\mathrm{pw}}_{t_0}$, whose average gives $\hat{\lambda}_{t_0}$ at this Merton point.</p>
+          <p class="caption">Stage 2 averages pathwise BPTT sensitivities to obtain a local marginal-value signal at the query state.</p>
         </article>
 
-        <article class="figure-card">
-          <div class="figure-head">
+        <article class="figure-card recovery-card">
+          <div class="figure-head recovery-head">
             <div>
               <p class="eyebrow">Figure 3</p>
-              <h2>Control recovery</h2>
+              <h2 id="recoveryTitle" aria-live="polite">Smooth control recovery</h2>
+            </div>
+            <div class="mode-switch" role="group" aria-label="Choose local correction example">
+              <button class="mode-button is-active" type="button" data-recovery-mode="smooth" aria-pressed="true">Smooth</button>
+              <button class="mode-button" type="button" data-recovery-mode="transaction" aria-pressed="false">Transaction costs</button>
             </div>
           </div>
-          <canvas id="hamiltonianCanvas" width="520" height="190" aria-label="Hamiltonian maximization and control recovery"></canvas>
-          <div class="track-wrap compact single">
-            <div class="track-card">
-              <div class="track-label-row">
-                <span>Risky weight $\hat{\pi}$</span>
-                <span id="piEstimateText">$\hat{\pi}=0.280$</span>
-              </div>
-              <div class="track">
-                <div class="track-target" id="piTargetMarker"></div>
-                <div class="track-dot" id="piDot"></div>
-              </div>
-              <div class="track-foot">
-                <span id="piStartText">start 0.280</span>
-                <span id="piStarText">critical point 0.750</span>
+
+          <div data-recovery-panel="smooth">
+            <canvas id="hamiltonianCanvas" width="520" height="190" aria-label="Hamiltonian maximization and control recovery"></canvas>
+            <div class="track-wrap compact single">
+              <div class="track-card">
+                <div class="track-label-row">
+                  <span>Risky weight $\hat{\pi}$</span>
+                  <span id="piEstimateText">$\hat{\pi}=0.280$</span>
+                </div>
+                <div class="track">
+                  <div class="track-target" id="piTargetMarker"></div>
+                  <div class="track-dot" id="piDot"></div>
+                </div>
+                <div class="track-foot">
+                  <span id="piStartText">start 0.280</span>
+                  <span id="piStarText">critical point 0.750</span>
+                </div>
               </div>
             </div>
+            <canvas id="piConvCanvas" width="520" height="100" aria-label="Pi convergence"></canvas>
+            <p class="caption">As $\hat{\lambda}_{t_0}$ improves, $\hat{\pi}$ moves toward the Hamiltonian critical point.</p>
           </div>
-          <canvas id="piConvCanvas" width="520" height="100" aria-label="Pi convergence"></canvas>
-          <p class="caption">As $\hat{\lambda}_{t_0}$ improves, $\hat{\pi}$ moves toward the Hamiltonian critical point.</p>
+
+          <div data-recovery-panel="transaction" hidden>
+            <canvas id="tcProjectionCanvas" width="520" height="190" aria-label="Transaction-cost dead-zone projection"></canvas>
+            <div class="track-wrap compact single">
+              <div class="track-card">
+                <div class="track-label-row">
+                  <span>Costate ratio $\hat R=\hat\lambda_y/\hat\lambda_x$</span>
+                  <span class="track-value-wrap">
+                    <span id="tcEstimateText">$\hat R=1.085$</span>
+                    <span id="tcRegimeBadge" class="regime-badge" data-regime="buy">BUY</span>
+                  </span>
+                </div>
+                <div id="tcTrack" class="track tc-track">
+                  <div id="tcHoldZone" class="tc-hold-zone"></div>
+                  <div id="tcLowerBoundary" class="tc-boundary"></div>
+                  <div id="tcUpperBoundary" class="tc-boundary"></div>
+                  <div id="tcTargetMarker" class="track-target"></div>
+                  <div id="tcDot" class="track-dot" data-regime="buy"></div>
+                </div>
+                <div class="track-foot track-foot-three">
+                  <span id="tcFootLeft">sell</span>
+                  <span id="tcFootCenter">hold</span>
+                  <span id="tcFootRight">buy</span>
+                </div>
+              </div>
+            </div>
+            <canvas id="tcConvergenceCanvas" width="520" height="100" aria-label="Costate-ratio convergence"></canvas>
+            <p class="caption">The costate ratio selects buy, hold, or sell. Across a state domain, the local hold classifications trace the no-trade region.</p>
+          </div>
         </article>
       </section>
 
-      <section class="equation-row">
+      <section class="equation-row" data-recovery-equations="smooth">
         <article class="eq-card">
           <h3>Model and objective</h3>
           <div class="eq-body eq-body-block">
@@ -122,13 +159,41 @@
         </article>
       </section>
 
-      <section class="note-card">
-        <p><strong>Scope.</strong> This page shows the idea at one Merton point $(t_0,x_0)$. In the full PG-DPO method, the same costate-to-control step is learned over a Markov state domain.</p>
-        <p><strong>Extension.</strong> Beyond this Merton example, the PG-DPO idea can be extended to constrained control, non-Markovian dynamics, non-exponential discounting, transaction costs, and other continuous-time decision problems.</p>
+      <section class="equation-row" data-recovery-equations="transaction" hidden>
+        <article class="eq-card">
+          <h3>State and liquidation wealth</h3>
+          <div class="eq-body eq-body-block">
+            <div>$$Z_t=(X_t,Y_t),\qquad L_t=X_t+(1-\alpha)Y_t$$</div>
+            <div>$$U(\ell)=\frac{\ell^{1-\gamma}}{1-\gamma},\qquad \max_u\mathbb{E}\left[U(L_T)\right]$$</div>
+          </div>
+        </article>
+        <article class="eq-card">
+          <h3>Nonsmooth local Hamiltonian</h3>
+          <div class="eq-body eq-body-block">
+            <div>$$H(u;\lambda)=L_t\left[-\lambda_xu^+ +(1-\alpha)\lambda_xu^-+\lambda_yu\right]$$</div>
+            <div>$$H^{\varepsilon}(u;\lambda)=H(u;\lambda)-\frac{\varepsilon}{2}L_t\lambda_xu^2$$</div>
+          </div>
+        </article>
+        <article class="eq-card">
+          <h3>Dead-zone projection</h3>
+          <div class="eq-body eq-body-block tc-equation-dense">
+            <div>$$R=\frac{\lambda_y}{\lambda_x},\qquad P_\varepsilon(R)=\begin{cases}
+              \dfrac{R-1}{\varepsilon},&R>1,\\[2pt]
+              0,&1-\alpha\le R\le1,\\[2pt]
+              \dfrac{R-(1-\alpha)}{\varepsilon},&R<1-\alpha.
+            \end{cases}$$</div>
+          </div>
+        </article>
       </section>
 
+      <section class="note-card">
+        <p><strong>Shared pipeline.</strong> Figures 1 and 2 stay fixed. Figure 3 switches only the local costate-to-action map.</p>
+        <p><strong>Scope.</strong> This page illustrates one query point. The transaction-cost convergence curve is schematic rather than live training output.</p>
+        <p><strong>References.</strong> <a href="docs/transaction-costs.md">Transaction-cost note</a> · <a href="references/recovering-no-trade-regions-aqfc-2026.md">AQFC 2026 reference note</a></p>
+      </section>
     </main>
 
     <script src="app.js"></script>
+    <script src="local-corrections.js"></script>
   </body>
 </html>
