@@ -324,12 +324,41 @@
   }
 
   const overlayTargets = {
+    core: installOverlay(document.getElementById("costateCanvas"), "coreBpttGlowCanvas"),
     constraints: installOverlay(document.getElementById("constraintAdjointCanvas"), "constraintBpttGlowCanvas"),
     nonexp: installOverlay(document.getElementById("nonexpAdjointCanvas"), "nonexpBpttGlowCanvas"),
   };
 
   function bpttIsActive(mode) {
     return state.mode === mode && state.playing && state.warmup >= 0.999 && state.stageIndex < stageCounts.length;
+  }
+
+  function drawCoreBpttGlow() {
+    const target = overlayTargets.core;
+    const { ctx, width, height } = setupOverlay(target);
+    if (!ctx || !bpttIsActive("core")) return;
+
+    const pad = { left: 46, right: 18, top: 24, bottom: 34 };
+    const xScale = (t) => pad.left + t * (width - pad.left - pad.right);
+    const yScale = (v) => height - pad.bottom - v * (height - pad.top - pad.bottom);
+    const clock = performance.now() * 0.00072;
+    const paths = [
+      { offset: 0.00, width: 3.2, path: (t) => clamp(0.50 + 0.08 * Math.sin(7.2 * t + 0.2) + 0.08 * t, 0.12, 0.90) },
+      { offset: 0.18, width: 2.2, path: (t) => clamp(0.61 + 0.07 * Math.sin(6.4 * t + 1.3) - 0.13 * t, 0.12, 0.90) },
+      { offset: 0.36, width: 2.0, path: (t) => clamp(0.39 + 0.09 * Math.sin(8.6 * t + 2.2) + 0.13 * t, 0.12, 0.90) },
+      { offset: 0.54, width: 1.8, path: (t) => clamp(0.55 + 0.05 * Math.sin(11.0 * t + 3.0) - 0.03 * t, 0.12, 0.90) },
+    ];
+
+    paths.forEach((entry) => {
+      const phase = (clock + entry.offset) % 1;
+      drawBackwardSweep(ctx, entry.path, xScale, yScale, 0, phase, COLORS.orange, entry.width);
+    });
+
+    ctx.fillStyle = rgba(COLORS.yellow, 0.92);
+    ctx.font = "bold 10px Inter,system-ui,sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("BPTT backward:  t₀  ←  T", width - pad.right, 18);
+    ctx.textAlign = "left";
   }
 
   function drawConstraintBpttGlow() {
@@ -417,6 +446,7 @@
   }
 
   function drawBpttOverlays() {
+    drawCoreBpttGlow();
     drawConstraintBpttGlow();
     drawNonexpBpttGlow();
   }
@@ -483,5 +513,9 @@
   const p = new URLSearchParams(location.search), example = p.get("example"), legacy = p.get("mode");
   const initial = example === "constraints" || legacy === "constraints" ? "constraints" :
     (example === "non-exponential" || example === "nonexp" || legacy === "non-exponential" || legacy === "nonexp") ? "nonexp" : "core";
-  setMode(initial, false); requestAnimationFrame(animate); setTimeout(() => { if (state.mode !== "core") restart(); }, 350);
+  setMode(initial, false);
+  requestAnimationFrame(animate);
+  // Keep the overlay clock synchronized with the core app's initial autoplay as
+  // well as the paper-specific modes.
+  setTimeout(restart, 350);
 })();
