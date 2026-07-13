@@ -21,6 +21,36 @@
     play: document.getElementById("playButton"),
     reset: document.getElementById("resetButton"),
   };
+
+  // Use roughly twice the original vertical chart space. The larger plotting
+  // areas reduce label collisions while the page continues to scroll naturally.
+  const chartHeights = {
+    fsdeCanvas: 380,
+    hamiltonianCanvas: 380,
+    tcProjectionCanvas: 380,
+    constraintRolloutCanvas: 380,
+    nonexpKernelCanvas: 380,
+    constraintRecoveryCanvas: 380,
+    nonexpRecoveryCanvas: 380,
+    trainCanvas: 300,
+    constraintFeasibleCanvas: 300,
+    nonexpAnchorCanvas: 300,
+    costateCanvas: 376,
+    constraintAdjointCanvas: 376,
+    nonexpAdjointCanvas: 376,
+    lambdaConvCanvas: 144,
+    constraintAdjointConvCanvas: 144,
+    nonexpDiagonalCanvas: 144,
+    piConvCanvas: 200,
+    tcConvergenceCanvas: 216,
+    constraintResidualCanvas: 216,
+    nonexpResidualCanvas: 216,
+  };
+  Object.entries(chartHeights).forEach(([id, height]) => {
+    const canvas = document.getElementById(id);
+    if (canvas) canvas.style.aspectRatio = `520 / ${height}`;
+  });
+
   const state = { mode: "core", warmup: 0, stageIndex: 0, stageTimer: 0, playing: false, lastTimestamp: 0 };
   const drawers = {};
 
@@ -158,7 +188,12 @@
 
   window.PGDemo = { stageCounts, COLORS, state, clamp, lerp, easeOut, fmt, expFmt, setupCanvas, drawBackground, drawGrid, drawAxes, drawArrow, stageContext, recoveryProgress, visiblePathCount, drawProgressSeries, registerMode };
 
-  els.buttons.forEach((b) => b.addEventListener("click", () => setMode(b.dataset.paperMode, true)));
+  els.buttons.forEach((b) => b.addEventListener("click", () => {
+    setMode(b.dataset.paperMode, true);
+    if (b.dataset.paperMode === "core") {
+      requestAnimationFrame(() => els.play?.click());
+    }
+  }));
   els.play?.addEventListener("click", restart); els.reset?.addEventListener("click", reset);
   window.addEventListener("resize", drawActive); window.addEventListener("pgdpo:ready", drawActive);
 
