@@ -1,7 +1,50 @@
 (() => {
   "use strict";
   const D = window.PGDemo; if (!D) return;
-  const { stageCounts, COLORS, state, lerp, easeOut, fmt, expFmt, setupCanvas, drawBackground, drawGrid, drawAxes, drawArrow, recoveryProgress, visiblePathCount, drawProgressSeries } = D;
+  const { stageCounts, COLORS, state, clamp, lerp, easeOut, fmt, expFmt, setupCanvas, drawBackground, drawGrid, drawAxes, drawArrow, stageContext, recoveryProgress, drawProgressSeries } = D;
+  if (!document.getElementById("compact-equation-card-styles")) {
+    const style = document.createElement("style");
+    style.id = "compact-equation-card-styles";
+    style.textContent = `
+      .paper-equation-stack > [data-paper-equations][hidden],
+      .equation-stack > [data-recovery-equations][hidden] {
+        display: none !important;
+      }
+      .paper-equation-stack,
+      .paper-equation-stack > [data-paper-equations],
+      .paper-equation-stack .equation-stack {
+        align-items: start;
+      }
+      .paper-equation-stack .equation-row {
+        align-items: start;
+      }
+      .paper-equation-stack .eq-card {
+        align-self: start;
+        height: auto;
+      }
+      .paper-equation-stack .eq-body {
+        min-height: 0 !important;
+        align-items: stretch;
+        justify-content: flex-start;
+        padding-bottom: 4px !important;
+      }
+      .paper-equation-stack .adjoint-bsde-block {
+        padding-bottom: 2px !important;
+      }
+      .paper-equation-stack .adjoint-bsde-block.is-dense {
+        padding-bottom: 3px !important;
+      }
+      #constraintBpttGlowCanvas,
+      #nonexpBpttGlowCanvas {
+        display: none !important;
+      }
+      @media (max-height: 900px) {
+        .paper-equation-stack .eq-body { min-height: 0 !important; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   const els = {
     rollout: document.getElementById("constraintRolloutCanvas"), feasible: document.getElementById("constraintFeasibleCanvas"),
     adjoint: document.getElementById("constraintAdjointCanvas"), conv: document.getElementById("constraintAdjointConvCanvas"),
@@ -16,6 +59,9 @@
   const constraintRecoveryPanel = els.recovery?.closest('[data-paper-panel="constraints"]');
   const constraintCaption = constraintRecoveryPanel?.querySelector('.caption');
   if (constraintCaption) constraintCaption.textContent = "The active query wants to move beyond the feasible set, so KKT recovery stops at u₁=0; the same adjoints also handle near-boundary and interior queries.";
+  const constraintAdjointPanel = els.adjoint?.closest('[data-paper-panel="constraints"]');
+  const constraintAdjointCaption = constraintAdjointPanel?.querySelector('.caption');
+  if (constraintAdjointCaption) constraintAdjointCaption.textContent = "Each backward sweep deposits one pathwise first- and second-order adjoint sample. The thin paths remain while the thick Monte Carlo means emerge.";
 
   const queries = [
     { id: "active", label: "A", color: COLORS.red, soft: COLORS.redSoft, start: [0.22, 0.42], target: [0, 0.58], unconstrained: [-0.16, 0.66], r0: 5.2e-2, r1: 1.1e-4 },
@@ -62,22 +108,95 @@
     ctx.fillStyle = COLORS.green; ctx.font = "bold 10px Inter,system-ui,sans-serif"; ctx.fillText("strictly feasible", sx + size * .36, sy - size * .66);
   }
 
-  function drawAdjointHalf(ctx, area, kind, visible) {
-    const { left, top, width, height } = area, n = 50, xs = k => left + k / n * width;
-    const base = t => kind === "lambda" ? 1.18 - .36 * t + .04 * Math.sin(5.3 * t) : 1.72 - .58 * t + .06 * Math.cos(4.6 * t + .4);
+  const maxAdjointSamples = 8;
+
+  function sampleProgress(maxSamples) {
+    const { completed, progress } = stageContext();
+    const u = clamp((completed + progress) / stageCounts.length, 0, 1);
+    const total = u * maxSamples;
+    const deposited = Math.min(maxSamples, Math.floor(total + 1e-9));
+    const active = deposited < maxSamples ? total - deposited : 0;
+    const meanAlpha = clamp((total - 1.2) / 2.8, 0, 1);
+    return { total, deposited, active, meanAlpha };
+  }
+
+  function adjointBase(kind, t) {
+    return kind === "lambda" ? 1.18 - .36 * t + .04 * Math.sin(5.3 * t) : 1.72 - .58 * t + .06 * Math.cos(4.6 * t + .4);
+  }
+
+  function adjointSample(kind, sample, t) {
+    const amplitude = kind === "lambda" ? .014 + .0022 * (sample % 4) : .018 + .0026 * (sample % 4);
+    const phase = .79 * sample + (kind === "lambda" ? .15 : 1.05);
+    const slowShift = (sample - (maxAdjointSamples - 1) / 2) * (kind === "lambda" ? .0018 : .0023) * (1 - .45 * t);
+    return adjointBase(kind, t) + amplitude * Math.sin(8.5 * t + phase) * (1 - .38 * t) + slowShift;
+  }
+
+  function strokeAdjointPath(ctx, xs, ys, kind, sample, startT, endT, color, alpha, lineWidth, glow = false) {
+    const n = 80, from = Math.round(startT * n), to = Math.round(endT * n), step = from <= to ? 1 : -1;
+    ctx.save();
+    if (glow) {
+      ctx.shadowBlur = 17;
+      ctx.shadowColor = color.replace(",1)", ",.95)");
+    }
+    ctx.beginPath();
+    let first = true;
+    for (let k = from; step > 0 ? k <= to : k >= to; k += step) {
+      const t = k / n, x = xs(t), y = ys(adjointSample(kind, sample, t));
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color.replace(",1)", `,${alpha})`); ctx.lineWidth = lineWidth; ctx.stroke();
+    ctx.restore();
+
+    if (glow) {
+      const fx = xs(endT), fy = ys(adjointSample(kind, sample, endT));
+      const pulse = .5 + .5 * Math.sin(performance.now() * .012);
+      ctx.save();
+      ctx.shadowBlur = 14; ctx.shadowColor = COLORS.yellow;
+      ctx.beginPath(); ctx.fillStyle = COLORS.yellow.replace(",1)", `,${.78 + .18 * pulse})`); ctx.arc(fx, fy, 3.5 + 1.1 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      for (let j = 0; j < 3; j++) {
+        ctx.beginPath(); ctx.fillStyle = color.replace(",1)", `,${.48 - .10 * j})`); ctx.arc(fx + 8 + 6 * j, fy + Math.sin(performance.now() * .006 + j) * 2.1, 2.1 - .35 * j, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawAdjointHalf(ctx, area, kind, progressInfo) {
+    const { left, top, width, height } = area, xs = t => left + t * width;
     const ymin = kind === "lambda" ? .72 : 1.02, ymax = kind === "lambda" ? 1.28 : 1.90, ys = v => top + height - (v - ymin) / (ymax - ymin) * height;
-    ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.06)"; for (let i = 0; i <= 3; i++) { const y = top + i / 3 * height; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke(); }
-    for (let p = 0; p < visible; p++) { ctx.beginPath(); for (let k = 0; k <= n; k++) { const t = k / n, v = base(t) + (.035 + .006 * (p % 3)) * Math.sin(8.5 * t + .72 * p) * (1 - .35 * t); if (!k) ctx.moveTo(xs(k), ys(v)); else ctx.lineTo(xs(k), ys(v)); } ctx.strokeStyle = kind === "lambda" ? "rgba(255,176,122,.20)" : "rgba(143,216,255,.20)"; ctx.lineWidth = 1; ctx.stroke(); }
-    ctx.beginPath(); for (let k = 0; k <= n; k++) { const t = k / n; if (!k) ctx.moveTo(xs(k), ys(base(t))); else ctx.lineTo(xs(k), ys(base(t))); } ctx.strokeStyle = kind === "lambda" ? COLORS.orange : COLORS.blue; ctx.lineWidth = 2.3; ctx.stroke();
-    ctx.fillStyle = COLORS.text; ctx.font = "bold 10px Inter,system-ui,sans-serif"; ctx.fillText(kind === "lambda" ? "first-order λ" : "curvature −P", left + 6, top + 12); ctx.restore();
+    const color = kind === "lambda" ? COLORS.orange : COLORS.blue;
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,.06)";
+    for (let i = 0; i <= 3; i++) { const y = top + i / 3 * height; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke(); }
+
+    for (let sample = 0; sample < progressInfo.deposited; sample++) {
+      strokeAdjointPath(ctx, xs, ys, kind, sample, 0, 1, color, .31, sample < 2 ? 1.35 : 1.05);
+    }
+    if (progressInfo.active > .005 && progressInfo.deposited < maxAdjointSamples) {
+      const front = 1 - progressInfo.active;
+      strokeAdjointPath(ctx, xs, ys, kind, progressInfo.deposited, 1, front, color, .96, 2.45, true);
+    }
+
+    if (progressInfo.meanAlpha > .005) {
+      ctx.beginPath();
+      for (let k = 0; k <= 80; k++) { const t = k / 80; if (!k) ctx.moveTo(xs(t), ys(adjointBase(kind, t))); else ctx.lineTo(xs(t), ys(adjointBase(kind, t))); }
+      ctx.strokeStyle = color.replace(",1)", `,${.22 + .78 * progressInfo.meanAlpha})`); ctx.lineWidth = 1.7 + .7 * progressInfo.meanAlpha; ctx.stroke();
+    }
+
+    ctx.fillStyle = COLORS.text; ctx.font = "bold 10px Inter,system-ui,sans-serif"; ctx.fillText(kind === "lambda" ? "first-order λ" : "curvature −P", left + 6, top + 12);
+    ctx.restore();
   }
 
   function drawAdjoint() {
     const { ctx, width, height } = setupCanvas(els.adjoint); if (!ctx || width < 2) return; drawBackground(ctx, width, height);
-    const visible = visiblePathCount(12), left = 42, right = 14, top = 20, bottom = 18, gap = 16, h = (height - top - bottom - gap) / 2;
-    drawAdjointHalf(ctx, { left, top, width: width - left - right, height: h }, "lambda", visible);
-    drawAdjointHalf(ctx, { left, top: top + h + gap, width: width - left - right, height: h }, "curvature", visible);
-    ctx.fillStyle = COLORS.muted; ctx.font = "10px Inter,system-ui,sans-serif"; ctx.textAlign = "right"; ctx.fillText(`BPTT continuations shown: ${visible}`, width - right, 14); ctx.fillText("time", width - right, height - 5); ctx.textAlign = "left";
+    const progressInfo = sampleProgress(maxAdjointSamples), left = 42, right = 14, top = 20, bottom = 18, gap = 16, h = (height - top - bottom - gap) / 2;
+    drawAdjointHalf(ctx, { left, top, width: width - left - right, height: h }, "lambda", progressInfo);
+    drawAdjointHalf(ctx, { left, top: top + h + gap, width: width - left - right, height: h }, "curvature", progressInfo);
+    const shown = Math.min(maxAdjointSamples, progressInfo.deposited + (progressInfo.active > .03 ? 1 : 0));
+    ctx.fillStyle = COLORS.yellow; ctx.font = "bold 10px Inter,system-ui,sans-serif"; ctx.textAlign = "left"; ctx.fillText("BPTT backward:  t₀  ←  T", left, 14);
+    ctx.fillStyle = COLORS.muted; ctx.font = "10px Inter,system-ui,sans-serif"; ctx.textAlign = "right"; ctx.fillText(`pathwise samples deposited: ${shown}/${maxAdjointSamples}`, width - right, 14); ctx.fillText("time", width - right, height - 5); ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,228,141,.82)"; ctx.font = "9px Inter,system-ui,sans-serif"; ctx.fillText("thin paths remain · thick line = Monte Carlo mean", left, height - 5);
   }
 
   const lambdaVals = stageCounts.map((n, i) => 1 + .17 * Math.exp(-1.25 * Math.log10(n)) + .01 * Math.sin(.8 * i) * Math.exp(-.2 * i));
