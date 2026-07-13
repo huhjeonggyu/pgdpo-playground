@@ -158,7 +158,12 @@
 
   window.PGDemo = { stageCounts, COLORS, state, clamp, lerp, easeOut, fmt, expFmt, setupCanvas, drawBackground, drawGrid, drawAxes, drawArrow, stageContext, recoveryProgress, visiblePathCount, drawProgressSeries, registerMode };
 
-  els.buttons.forEach((b) => b.addEventListener("click", () => setMode(b.dataset.paperMode, true)));
+  els.buttons.forEach((b) => b.addEventListener("click", () => {
+    setMode(b.dataset.paperMode, true);
+    if (b.dataset.paperMode === "core") {
+      requestAnimationFrame(() => els.play?.click());
+    }
+  }));
   els.play?.addEventListener("click", restart); els.reset?.addEventListener("click", reset);
   window.addEventListener("resize", drawActive); window.addEventListener("pgdpo:ready", drawActive);
 
