@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const D = window.PGDemo; if (!D) return;
-  const { stageCounts, COLORS, state, lerp, easeOut, setupCanvas, drawBackground, drawGrid, drawAxes, drawArrow, recoveryProgress, visiblePathCount, drawProgressSeries } = D;
+  const { stageCounts, COLORS, state, clamp, lerp, easeOut, setupCanvas, drawBackground, drawGrid, drawAxes, drawArrow, stageContext, recoveryProgress, drawProgressSeries } = D;
   const els = {
     kernel: document.getElementById("nonexpKernelCanvas"), anchor: document.getElementById("nonexpAnchorCanvas"),
     adjoint: document.getElementById("nonexpAdjointCanvas"), diagonal: document.getElementById("nonexpDiagonalCanvas"),
@@ -13,7 +13,7 @@
   const titles = ["Decision-time anchoring", "Anchored adjoints → diagonal", "Local Hamiltonian correction"];
   const captions = [
     "Each decision time evaluates the remaining horizon with its own kernel. Stage 1 samples and optimizes these anchored continuation problems.",
-    "BPTT averages pathwise sensitivities for each anchor; the action step uses only the diagonal value whose anchor equals the decision time.",
+    "Each terminal-to-anchor BPTT sweep deposits a pathwise adjoint sample. The thin paths remain, their Monte Carlo means emerge, and local synthesis uses the diagonal anchor t₀=t.",
     "At each query time, the warm-up action moves to the maximizer of the Hamiltonian anchored at that same time."
   ];
   nonexpPanels.forEach((panel, i) => {
@@ -109,34 +109,89 @@
     return 1.30 - .42 * s + .10 * anchor + .035 * Math.sin(4.8 * s + 1.2 * anchor);
   }
 
+  const samplesPerAnchor = 5;
+
+  function sampleProgress(maxSamples) {
+    const { completed, progress } = stageContext();
+    const u = clamp((completed + progress) / stageCounts.length, 0, 1);
+    const total = u * maxSamples;
+    const deposited = Math.min(maxSamples, Math.floor(total + 1e-9));
+    const active = deposited < maxSamples ? total - deposited : 0;
+    const meanAlpha = clamp((total - 1.0) / 2.5, 0, 1);
+    return { total, deposited, active, meanAlpha };
+  }
+
+  function anchoredSample(q, anchorIndex, sample, t) {
+    if (t < q.t) return NaN;
+    const s = (t - q.t) / Math.max(1e-6, 1 - q.t);
+    const amplitude = .009 + .0022 * (sample % 3);
+    const offset = (sample - (samplesPerAnchor - 1) / 2) * .0018 * (1 - .45 * s);
+    return mean(q.t, t) + amplitude * Math.sin(9.2 * s + .83 * sample + .55 * anchorIndex) * (1 - .42 * s) + offset;
+  }
+
+  function strokeAnchoredPath(ctx, xs, ys, q, anchorIndex, sample, startT, endT, alpha, lineWidth, glow = false) {
+    const n = 90, from = Math.round(startT * n), to = Math.round(endT * n), step = from <= to ? 1 : -1;
+    ctx.save();
+    if (glow) {
+      ctx.shadowBlur = 17;
+      ctx.shadowColor = q.color.replace(",1)", ",.95)");
+    }
+    ctx.beginPath();
+    let first = true;
+    for (let k = from; step > 0 ? k <= to : k >= to; k += step) {
+      const t = k / n;
+      if (t < q.t) continue;
+      const x = xs(t), y = ys(anchoredSample(q, anchorIndex, sample, t));
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = q.color.replace(",1)", `,${alpha})`); ctx.lineWidth = lineWidth; ctx.stroke();
+    ctx.restore();
+
+    if (glow) {
+      const fx = xs(endT), fy = ys(anchoredSample(q, anchorIndex, sample, endT));
+      const pulse = .5 + .5 * Math.sin(performance.now() * .012 + anchorIndex);
+      ctx.save();
+      ctx.shadowBlur = 14; ctx.shadowColor = COLORS.yellow;
+      ctx.beginPath(); ctx.fillStyle = COLORS.yellow.replace(",1)", `,${.78 + .18 * pulse})`); ctx.arc(fx, fy, 3.5 + 1.1 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      for (let j = 0; j < 3; j++) {
+        ctx.beginPath(); ctx.fillStyle = q.color.replace(",1)", `,${.48 - .10 * j})`); ctx.arc(fx + 8 + 6 * j, fy + Math.sin(performance.now() * .006 + j + anchorIndex) * 2.1, 2.1 - .35 * j, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
   function drawAdjoint() {
     const { ctx, width, height } = setupCanvas(els.adjoint); if (!ctx || width < 2) return; drawBackground(ctx, width, height);
     const pad = { left: 44, right: 18, top: 35, bottom: 30 }; drawGrid(ctx, width, height, pad); drawAxes(ctx, width, height, pad, "time", "anchored marginal value λᵗ⁰(t)");
-    const xs = t => pad.left + t * (width - pad.left - pad.right), ys = v => height - pad.bottom - (v - .78) / .64 * (height - pad.top - pad.bottom), visible = visiblePathCount(8);
+    const xs = t => pad.left + t * (width - pad.left - pad.right), ys = v => height - pad.bottom - (v - .78) / .64 * (height - pad.top - pad.bottom), progressInfo = sampleProgress(samplesPerAnchor);
 
     ctx.font = "10px Inter,system-ui,sans-serif";
-    ctx.strokeStyle = "rgba(241,246,255,.22)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.left, 16); ctx.lineTo(pad.left + 18, 16); ctx.stroke();
-    ctx.fillStyle = COLORS.muted; ctx.fillText("pathwise BPTT", pad.left + 24, 19);
-    ctx.strokeStyle = COLORS.yellow; ctx.lineWidth = 2.3; ctx.beginPath(); ctx.moveTo(pad.left + 112, 16); ctx.lineTo(pad.left + 130, 16); ctx.stroke();
-    ctx.fillStyle = COLORS.muted; ctx.fillText("Monte Carlo mean", pad.left + 136, 19);
-    ctx.textAlign = "right"; ctx.fillStyle = COLORS.yellow; ctx.fillText(`${visible} continuations / anchor`, width - pad.right, 19); ctx.textAlign = "left";
+    ctx.strokeStyle = "rgba(241,246,255,.34)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(pad.left, 16); ctx.lineTo(pad.left + 18, 16); ctx.stroke();
+    ctx.fillStyle = COLORS.muted; ctx.fillText("deposited pathwise samples", pad.left + 24, 19);
+    ctx.strokeStyle = COLORS.yellow; ctx.lineWidth = 2.3; ctx.beginPath(); ctx.moveTo(pad.left + 156, 16); ctx.lineTo(pad.left + 174, 16); ctx.stroke();
+    ctx.fillStyle = COLORS.muted; ctx.fillText("Monte Carlo mean", pad.left + 180, 19);
+    const shown = Math.min(samplesPerAnchor, progressInfo.deposited + (progressInfo.active > .03 ? 1 : 0));
+    ctx.textAlign = "right"; ctx.fillStyle = COLORS.yellow; ctx.fillText(`${shown}/${samplesPerAnchor} samples / anchor`, width - pad.right, 19); ctx.font = "bold 9px Inter,system-ui,sans-serif"; ctx.fillText("BPTT:  t₀  ←  T", width - pad.right, 32); ctx.textAlign = "left";
 
     queries.forEach((q, ai) => {
-      for (let p = 0; p < visible; p++) {
+      for (let sample = 0; sample < progressInfo.deposited; sample++) {
+        strokeAnchoredPath(ctx, xs, ys, q, ai, sample, q.t, 1, .29, sample < 2 ? 1.25 : 1.0);
+      }
+      if (progressInfo.active > .005 && progressInfo.deposited < samplesPerAnchor) {
+        const front = 1 - progressInfo.active * (1 - q.t);
+        strokeAnchoredPath(ctx, xs, ys, q, ai, progressInfo.deposited, 1, front, .96, 2.45, true);
+      }
+
+      if (progressInfo.meanAlpha > .005) {
         ctx.beginPath(); let started = false;
-        for (let k = 0; k <= 70; k++) {
-          const t = k / 70; if (t < q.t) continue;
-          const s = (t - q.t) / (1 - q.t), y = ys(mean(q.t, t) + .028 * Math.sin(9 * s + .8 * p + ai) * (1 - .4 * s));
-          if (!started) { ctx.moveTo(xs(t), y); started = true; } else ctx.lineTo(xs(t), y);
+        for (let k = 0; k <= 90; k++) {
+          const t = k / 90; if (t < q.t) continue;
+          if (!started) { ctx.moveTo(xs(t), ys(mean(q.t, t))); started = true; } else ctx.lineTo(xs(t), ys(mean(q.t, t)));
         }
-        ctx.strokeStyle = q.color.replace(",1)", ",.16)"); ctx.lineWidth = 1; ctx.stroke();
+        ctx.strokeStyle = q.color.replace(",1)", `,${.18 + .82 * progressInfo.meanAlpha})`); ctx.lineWidth = 1.7 + .7 * progressInfo.meanAlpha; ctx.stroke();
       }
-      ctx.beginPath(); let started = false;
-      for (let k = 0; k <= 70; k++) {
-        const t = k / 70; if (t < q.t) continue;
-        if (!started) { ctx.moveTo(xs(t), ys(mean(q.t, t))); started = true; } else ctx.lineTo(xs(t), ys(mean(q.t, t)));
-      }
-      ctx.strokeStyle = q.color; ctx.lineWidth = 2.4; ctx.stroke();
+
       const sx = xs(q.t), sy = ys(mean(q.t, q.t));
       ctx.beginPath(); ctx.fillStyle = q.color; ctx.arc(sx, sy, 4.8, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = q.color; ctx.font = "bold 10px Inter,system-ui,sans-serif"; ctx.fillText(`${q.label}: anchor t₀=${q.t.toFixed(2)}`, sx + 7, sy - 8);
