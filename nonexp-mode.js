@@ -124,9 +124,14 @@
   function anchoredSample(q, anchorIndex, sample, t) {
     if (t < q.t) return NaN;
     const s = (t - q.t) / Math.max(1e-6, 1 - q.t);
-    const amplitude = .009 + .0022 * (sample % 3);
-    const offset = (sample - (samplesPerAnchor - 1) / 2) * .0018 * (1 - .45 * s);
-    return mean(q.t, t) + amplitude * Math.sin(9.2 * s + .83 * sample + .55 * anchorIndex) * (1 - .42 * s) + offset;
+    const primaryAmplitude = .024 + .0050 * (sample % 3);
+    const secondaryAmplitude = .009 + .0024 * ((sample + anchorIndex) % 2);
+    const primaryPhase = .83 * sample + .55 * anchorIndex;
+    const secondaryPhase = 1.41 * sample + .86 * anchorIndex + .35;
+    const offset = (sample - (samplesPerAnchor - 1) / 2) * .0052 * (1 - .35 * s);
+    const primary = primaryAmplitude * Math.sin(7.8 * s + primaryPhase) * (1 - .24 * s);
+    const secondary = secondaryAmplitude * Math.sin(18.6 * s + secondaryPhase) * (.88 - .23 * s);
+    return mean(q.t, t) + primary + secondary + offset;
   }
 
   function strokeAnchoredPath(ctx, xs, ys, q, anchorIndex, sample, startT, endT, alpha, lineWidth, glow = false) {
@@ -176,7 +181,7 @@
 
     queries.forEach((q, ai) => {
       for (let sample = 0; sample < progressInfo.deposited; sample++) {
-        strokeAnchoredPath(ctx, xs, ys, q, ai, sample, q.t, 1, .29, sample < 2 ? 1.25 : 1.0);
+        strokeAnchoredPath(ctx, xs, ys, q, ai, sample, q.t, 1, .36, sample < 2 ? 1.35 : 1.08);
       }
       if (progressInfo.active > .005 && progressInfo.deposited < samplesPerAnchor) {
         const front = 1 - progressInfo.active * (1 - q.t);
@@ -217,7 +222,6 @@
   }
 
   const current = q => lerp(q.warm, q.target, recoveryProgress());
-
   function drawRecovery() {
     const { ctx, width, height } = setupCanvas(els.recovery); if (!ctx || width < 2) return; drawBackground(ctx, width, height);
     const outer = 14, gap = 10, top = 42, bottom = height - 28, panelW = (width - 2 * outer - 2 * gap) / 3;
