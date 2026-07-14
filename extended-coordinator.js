@@ -58,6 +58,15 @@
   function deactivateCustomMode() {
     state.active = null;
     state.playing = false;
+    paperPanels.forEach((node) => {
+      if (customModes.has(node.dataset.paperPanel)) node.hidden = true;
+    });
+    equationPanels.forEach((node) => {
+      if (customModes.has(node.dataset.paperEquations)) node.hidden = true;
+    });
+    notePanels.forEach((node) => {
+      if (customModes.has(node.dataset.paperNote)) node.hidden = true;
+    });
   }
 
   function drawActive() {
