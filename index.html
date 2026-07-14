@@ -1,34 +1,164 @@
-<!doctype html><html lang="en" class="is-booting"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta
-name="description"
-content="PG-DPO in three stages: warm-up, adjoint estimation, and local correction across smooth, constrained, transaction-cost, and non-exponential-discounting examples."
-/><title>PG-DPO Playground</title><link rel="icon" href="favicon.svg" type="image/svg+xml" /><link rel="stylesheet" href="style.css" /><link rel="stylesheet" href="local-corrections.css" /><link rel="stylesheet" href="research-modes.css" /><script>
-const revealPlayground = () => {
-const root = document.documentElement;
-if (!root.classList.contains('is-booting')) return;
-root.classList.remove('is-booting');
-root.classList.add('is-ready');
-window.requestAnimationFrame(() => {
-window.dispatchEvent(new Event('resize'));
-window.dispatchEvent(new Event('pgdpo:ready'));
-});
-};
-window.revealPlayground = revealPlayground;
-window.setTimeout(revealPlayground, 1800);
-window.MathJax = {
-tex: {
-inlineMath: [['$', '$'], ['\\(', '\\)']],
-displayMath: [['$$','$$'], ['\\[','\\]']]
-},
-svg: { fontCache: 'global' },
-startup: {
-ready: () => {
-MathJax.startup.defaultReady();
-MathJax.startup.promise.then(revealPlayground).catch(revealPlayground);
-}
-}
-};
-</script><script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script><noscript><style>html.is-booting body { visibility: visible !important; }</style></noscript></head><body><main class="page-shell"><header class="hero hero-compact"><div class="hero-compact-row"><p class="eyebrow hero-mark">PG-DPO</p><div class="action-row"><button id="playButton" class="button primary" type="button">Play</button><button id="resetButton" class="button secondary" type="button">Reset</button></div></div><div class="paper-mode-row"><span class="paper-mode-label">Example</span><div class="paper-mode-switch" role="group" aria-label="Choose a PG-DPO example"><button class="mode-button is-active" type="button" data-paper-mode="core" data-recovery-mode="smooth" aria-pressed="true">Smooth Merton</button><button class="mode-button" type="button" data-paper-mode="constraints" aria-pressed="false">Constraints</button><button class="mode-button" type="button" data-paper-mode="core" data-recovery-mode="transaction" aria-pressed="false">Transaction costs</button><button class="mode-button" type="button" data-paper-mode="nonexp" aria-pressed="false">Non-exponential</button></div></div></header><section class="stage-strip" aria-label="PG-DPO stages"><div class="stage-panel stage-panel-1"><span class="stage-badge">Stage 1</span><span class="stage-text">Warm-up</span></div><div class="stage-panel stage-panel-2"><span class="stage-badge stage-badge-2">Stage 2</span><span class="stage-text">Adjoint estimation</span></div><div class="stage-panel stage-panel-3"><span class="stage-badge stage-badge-3">Stage 3</span><span class="stage-text">Local correction</span></div></section><section class="workflow-row"><article class="figure-card"><div class="paper-panel-stack"><section data-paper-panel="core"><div class="figure-head"><div><p class="eyebrow">Figure 1</p><h2>Warm-up</h2></div></div><canvas id="fsdeCanvas" width="520" height="190" aria-label="Forward FSDE paths"></canvas><canvas id="trainCanvas" width="520" height="150" aria-label="Policy network training"></canvas><p class="caption">Stage 1 trains a feasible continuation policy by simulation. BPTT through the same rollout later provides adjoint information.</p></section><section data-paper-panel="constraints" hidden><div class="figure-head"><div><p class="eyebrow">Figure 1</p><h2>Feasible warm-up</h2></div></div><canvas id="constraintRolloutCanvas" width="520" height="190" aria-label="Feasible constrained portfolio rollouts"></canvas><canvas id="constraintFeasibleCanvas" width="520" height="150" aria-label="Activation-based feasible policy map"></canvas><p class="caption">Smooth activations keep the warm-up policy inside the pointwise control set, but feasibility alone does not impose KKT stationarity.</p></section><section data-paper-panel="nonexp" hidden><div class="figure-head"><div><p class="eyebrow">Figure 1</p><h2>Anchored warm-up</h2></div></div><canvas id="nonexpKernelCanvas" width="520" height="190" aria-label="Exponential, survival, and hyperbolic discount kernels"></canvas><canvas id="nonexpAnchorCanvas" width="520" height="150" aria-label="Random-anchor rollout objective"></canvas><p class="caption">Stage 1 samples decision anchors and optimizes explicitly anchored rollout objectives without assuming a Bellman recursion.</p></section></div></article><article class="figure-card figure-card-wide"><div class="paper-panel-stack"><section data-paper-panel="core"><div class="figure-head"><div><p class="eyebrow">Figure 2</p><h2>Costate estimation</h2></div></div><div class="figure2-stack"><canvas id="costateCanvas" width="520" height="188" aria-label="Backward costate estimation"></canvas><canvas id="lambdaConvCanvas" width="520" height="72" aria-label="Lambda convergence"></canvas></div><p class="caption">Stage 2 averages pathwise BPTT sensitivities to obtain local marginal-value signals at queried states.</p></section><section data-paper-panel="constraints" hidden><div class="figure-head"><div><p class="eyebrow">Figure 2</p><h2>First- and second-order adjoints</h2></div></div><div class="figure2-stack"><canvas id="constraintAdjointCanvas" width="520" height="188" aria-label="First- and second-order BPTT adjoint estimates"></canvas><canvas id="constraintAdjointConvCanvas" width="520" height="72" aria-label="First- and second-order adjoint convergence"></canvas></div><p class="caption">Once- and twice-differentiated continuations estimate $\hat\lambda$ and $\hat P$; the second-order adjoint supplies portfolio curvature.</p></section><section data-paper-panel="nonexp" hidden><div class="figure-head"><div><p class="eyebrow">Figure 2</p><h2>Decision-time anchored adjoints</h2></div></div><div class="figure2-stack"><canvas id="nonexpAdjointCanvas" width="520" height="188" aria-label="Anchored pathwise adjoint estimates"></canvas><canvas id="nonexpDiagonalCanvas" width="520" height="72" aria-label="Diagonal anchor equals decision time condition"></canvas></div><p class="caption">BPTT estimates anchor-dependent marginal values; local synthesis uses the diagonal specialization $t_0=t$.</p></section></div></article><article class="figure-card recovery-card"><div class="paper-panel-stack"><section data-paper-panel="core"><div class="figure-head recovery-head"><div><p class="eyebrow">Figure 3</p><h2 id="recoveryTitle" aria-live="polite">Smooth control recovery</h2></div></div><div class="recovery-panel-stack"><div data-recovery-panel="smooth"><canvas id="hamiltonianCanvas" width="520" height="190" aria-label="Hamiltonian maximization and control recovery"></canvas><div class="track-wrap compact single"><div class="track-card"><div class="track-label-row"><span>Risky weight $\hat{\pi}$</span><span id="piEstimateText">$\hat{\pi}=0.280$</span></div><div class="track"><div class="track-target" id="piTargetMarker"></div><div class="track-dot" id="piDot"></div></div><div class="track-foot"><span id="piStartText">start 0.280</span><span id="piStarText">critical point 0.750</span></div></div></div><canvas id="piConvCanvas" width="520" height="100" aria-label="Pi convergence"></canvas><p class="caption">As $\hat{\lambda}_{t_0}$ improves, $\hat{\pi}$ moves toward the Hamiltonian critical point.</p></div><div data-recovery-panel="transaction" hidden><canvas id="tcProjectionCanvas" width="520" height="190" aria-label="Transaction-cost dead-zone projection for three representative query points"></canvas><section class="tc-query-panel" aria-label="Representative transaction-cost query points"><div class="tc-query-panel-head"><span>Representative query points</span><span>R̂ → Pε(R̂)</span></div><div class="tc-query-grid"><div id="tcSellCard" class="tc-query-card" data-regime="sell"><div class="tc-query-card-head"><span class="tc-query-label"><span class="tc-query-swatch tc-query-swatch-sell"></span>Query S</span><span id="tcSellRegimeBadge" class="regime-badge" data-regime="sell">SELL</span></div><div id="tcSellEstimateText" class="tc-query-value">R̂ = 0.875 · û = -0.139</div></div><div id="tcHoldCard" class="tc-query-card" data-regime="hold"><div class="tc-query-card-head"><span class="tc-query-label"><span class="tc-query-swatch tc-query-swatch-hold"></span>Query H</span><span id="tcHoldRegimeBadge" class="regime-badge" data-regime="hold">HOLD</span></div><div id="tcHoldEstimateText" class="tc-query-value">R̂ = 0.980 · û = 0.000</div></div><div id="tcBuyCard" class="tc-query-card" data-regime="buy"><div class="tc-query-card-head"><span class="tc-query-label"><span class="tc-query-swatch tc-query-swatch-buy"></span>Query B</span><span id="tcBuyRegimeBadge" class="regime-badge" data-regime="buy">BUY</span></div><div id="tcBuyEstimateText" class="tc-query-value">R̂ = 1.035 · û = 0.194</div></div></div></section><canvas id="tcConvergenceCanvas" width="520" height="108" aria-label="Costate-ratio convergence for sell, hold, and buy query points"></canvas><p class="caption">Three representative query states converge to sell, hold, and buy regimes under the same costate-ratio projection.</p></div></div></section><section data-paper-panel="constraints" hidden><div class="figure-head"><div><p class="eyebrow">Figure 3</p><h2>KKT / QP recovery</h2></div></div><canvas id="constraintRecoveryCanvas" width="520" height="190" aria-label="Constrained portfolio recovery on a feasible simplex"></canvas><section class="insight-panel" aria-label="Representative constrained query points"><div class="insight-panel-head"><span>Representative query points</span><span>feasible DPO → local KKT</span></div><div class="insight-grid"><div class="insight-card" data-tone="active"><div class="insight-card-head"><span><span class="insight-swatch tone-active"></span>Active</span><span class="status-badge tone-active">BINDING</span></div><div id="constraintActiveText" class="insight-value">u = (0.000, 0.580) · res. 1.0e−4</div></div><div class="insight-card" data-tone="near"><div class="insight-card-head"><span><span class="insight-swatch tone-near"></span>Near switch</span><span class="status-badge tone-near">NEAR</span></div><div id="constraintNearText" class="insight-value">u = (0.050, 0.470) · res. 2.0e−4</div></div><div class="insight-card" data-tone="interior"><div class="insight-card-head"><span><span class="insight-swatch tone-interior"></span>Interior</span><span class="status-badge tone-interior">INTERIOR</span></div><div id="constraintInteriorText" class="insight-value">u = (0.280, 0.240) · res. 1.0e−4</div></div></div></section><canvas id="constraintResidualCanvas" width="520" height="108" aria-label="Projected KKT residual after local recovery"></canvas><p class="caption">The same learned adjoints support active, near-switching, and interior recovery; solver choice is downstream of adjoint acquisition.</p></section><section data-paper-panel="nonexp" hidden><div class="figure-head"><div><p class="eyebrow">Figure 3</p><h2>Diagonal Hamiltonian correction</h2></div></div><canvas id="nonexpRecoveryCanvas" width="520" height="190" aria-label="Decision-time diagonal equilibrium action recovery"></canvas><section class="insight-panel" aria-label="Representative non-exponential decision times"><div class="insight-panel-head"><span>Decision-time queries</span><span>anchor = decision time</span></div><div class="insight-grid"><div class="insight-card" data-tone="early"><div class="insight-card-head"><span><span class="insight-swatch tone-early"></span>Early</span><span class="status-badge tone-early">DIAGONAL</span></div><div id="nonexpEarlyText" class="insight-value">t = 0.18 · û = 1.38</div></div><div class="insight-card" data-tone="middle"><div class="insight-card-head"><span><span class="insight-swatch tone-middle"></span>Middle</span><span class="status-badge tone-middle">EQUIL.</span></div><div id="nonexpMiddleText" class="insight-value">t = 0.50 · û = 1.03</div></div><div class="insight-card" data-tone="late"><div class="insight-card-head"><span><span class="insight-swatch tone-late"></span>Late</span><span class="status-badge tone-late">DIAGONAL</span></div><div id="nonexpLateText" class="insight-value">t = 0.82 · û = 1.01</div></div></div></section><canvas id="nonexpResidualCanvas" width="520" height="108" aria-label="Hamiltonian residual before and after diagonal projection"></canvas><p class="caption">Decision-time anchoring converts BPTT marginal values into optimal controls for multiplicative kernels and equilibrium controls otherwise.</p></section></div></article></section><div class="paper-equation-stack"><div data-paper-equations="core"><div class="equation-stack"><section class="equation-row" data-recovery-equations="smooth"><article class="eq-card"><h3>Model and objective</h3><div class="eq-body eq-body-block"><div>$$dX_t = X_t\bigl(r + \pi_t(\mu-r)\bigr)dt + X_t\pi_t\sigma\,dW_t - c_t\,dt$$</div><div>$$U(x)=\frac{x^{1-\gamma}}{1-\gamma},\qquad \max_{(\pi,c)} \mathbb{E}\left[U(X_T)\right]$$</div></div></article><article class="eq-card"><h3>Hamiltonian</h3><div class="eq-body eq-body-block"><div>$$H(x,\pi,\lambda)=\lambda x\bigl(r+\pi(\mu-r)\bigr)-\frac{1}{2}\gamma\lambda x\sigma^2\pi^2$$</div></div></article><article class="eq-card"><h3>Recovered control</h3><div class="eq-body eq-body-block"><div>$$\hat{\pi}_t=-\frac{\hat{\lambda}_t}{X_t\,\partial_x\hat{\lambda}_t}\,\frac{\mu-r}{\sigma^2}$$</div></div></article></section><section class="equation-row" data-recovery-equations="transaction" hidden><article class="eq-card"><h3>State and liquidation wealth</h3><div class="eq-body eq-body-block"><div>$$Z_t=(X_t,Y_t),\qquad L_t=X_t+(1-\alpha)Y_t$$</div><div>$$U(\ell)=\frac{\ell^{1-\gamma}}{1-\gamma},\qquad \max_u\mathbb{E}\left[U(L_T)\right]$$</div></div></article><article class="eq-card"><h3>Nonsmooth local Hamiltonian</h3><div class="eq-body eq-body-block"><div>$$H(u;\lambda)=L_t\left[-\lambda_xu^+ +(1-\alpha)\lambda_xu^-+\lambda_yu\right]$$</div><div>$$H^{\varepsilon}(u;\lambda)=H(u;\lambda)-\frac{\varepsilon}{2}L_t\lambda_xu^2$$</div></div></article><article class="eq-card"><h3>Dead-zone projection</h3><div class="eq-body eq-body-block tc-equation-dense"><div>$$R=\frac{\lambda_y}{\lambda_x},\qquad P_\varepsilon(R)=\begin{cases}
-\dfrac{R-1}{\varepsilon},&R>1,\\[2pt]
-0,&1-\alpha\le R\le1,\\[2pt]
-\dfrac{R-(1-\alpha)}{\varepsilon},&R<1-\alpha.
-\end{cases}$$</div></div></article></section></div></div><section class="equation-row" data-paper-equations="constraints" hidden><article class="eq-card"><h3>Pointwise admissible set</h3><div class="eq-body eq-body-block"><div>$$U(t,x)=\{(\pi,C):\mathbf 1^\top\pi=1,\ \Gamma(t,x;\pi,C)\ge0\}$$</div><div>$$dX_t=(X_t\pi_t^\top\mu^e-C_t)dt+X_t\pi_t^\top v^e dW_t$$</div></div></article><article class="eq-card"><h3>Generalized Hamiltonian</h3><div class="eq-body eq-body-block constraint-equation-dense"><div>$$\mathcal H=e^{-\rho t}U(C)+\lambda b+\zeta^\top\sigma+\frac12P\|\sigma\|^2$$</div><div>$$\hat\lambda\approx\mathbb E[D_XJ],\qquad \hat P\approx\mathbb E[D^2_{XX}J]$$</div></div></article><article class="eq-card"><h3>Local KKT / QP recovery</h3><div class="eq-body eq-body-block constraint-equation-dense"><div>$$\hat u=\arg\max_{u\in K}\left\{a^\top u-\frac12u^\top Qu\right\}$$</div><div>$$a=x\{\hat\lambda(\mu-r\mathbf1)+v\hat\zeta\},\qquad Q=-x^2\hat P\Sigma$$</div></div></article></section><section class="equation-row" data-paper-equations="nonexp" hidden><article class="eq-card"><h3>Anchored objective</h3><div class="eq-body eq-body-block nonexp-equation-dense"><div>$$J(t_0,x;u)=\mathbb E_{t_0,x}\!\left[\int_{t_0}^{T}D(t_0,s)\ell(s,X_s,u_s)ds+D(t_0,T)g(X_T)\right]$$</div></div></article><article class="eq-card"><h3>Anchored Hamiltonian</h3><div class="eq-body eq-body-block nonexp-equation-dense"><div>$$H(t_0,t,x,u,\lambda,Z)=D(t_0,t)\ell(t,x,u)+\langle\lambda,b\rangle+\operatorname{Tr}(Z^\top\sigma)$$</div></div></article><article class="eq-card"><h3>Diagonal local correction</h3><div class="eq-body eq-body-block nonexp-equation-dense"><div>$$\hat u(t,x)\in\arg\max_{u\in U(x)}H\bigl(t,t,x,u,\hat\lambda(t,x),\hat Z(t,x)\bigr)$$</div><div>$$\text{multiplicative }D:\ \text{optimal};\qquad \text{otherwise}:\ \text{equilibrium}$$</div></div></article></section></div><div class="paper-note-stack"><section class="note-card" data-paper-note="core"><p><strong>Core examples.</strong> Smooth Merton and transaction costs share the rollout and costate panels; only the local costate-to-action map changes.</p><p><strong>Scope.</strong> The transaction-cost view uses representative sell, hold, and buy query points. Displayed convergence curves are schematic rather than live training output.</p></section><section class="note-card" data-paper-note="constraints" hidden><p><strong>Constrained portfolios.</strong> Activations enforce pointwise control feasibility; first- and second-order adjoints then define a solver-neutral local PMP/KKT recovery problem.</p><p><strong>Scope.</strong> The visualization covers pointwise control constraints, including state-dependent control bounds. Genuine state-path constraints require additional reflected, nonsmooth, or singular-control machinery.</p></section><section class="note-card" data-paper-note="nonexp" hidden><p><strong>Beyond Bellman recursion.</strong> Each query is anchored at its decision time, BPTT estimates the corresponding adjoint, and a diagonal Hamiltonian solve synthesizes the action.</p><p><strong>Scope.</strong> Multiplicative kernels lead to classical optimal controls; non-multiplicative kernels lead to time-consistent equilibrium controls. Curves are schematic educational outputs.</p></section></div></main><script src="app.js"></script><script src="local-corrections.js"></script><script src="research-modes.js"></script><script src="constraints-mode.js"></script><script src="nonexp-mode.js"></script></body></html>
+<!doctype html>
+<html lang="en" class="is-booting">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta
+    name="description"
+    content="Interactive PG-DPO playground: rollout warm-up, BPTT adjoint estimation, and local Pontryagin recovery for smooth, constrained, transaction-cost, non-exponential, and delay-control examples."
+  />
+  <title>PG-DPO Playground</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' },
+      startup: {
+        ready: () => {
+          MathJax.startup.defaultReady();
+          MathJax.startup.promise.finally(() => {
+            document.documentElement.classList.remove('is-booting');
+            document.documentElement.classList.add('is-ready');
+            window.dispatchEvent(new Event('pgdpo:ready'));
+          });
+        }
+      }
+    };
+    window.setTimeout(() => {
+      document.documentElement.classList.remove('is-booting');
+      document.documentElement.classList.add('is-ready');
+      window.dispatchEvent(new Event('pgdpo:ready'));
+    }, 1800);
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script defer src="playground.js"></script>
+  <noscript><style>html.is-booting body { visibility: visible !important; }</style></noscript>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="hero">
+      <div class="hero-top">
+        <div>
+          <p class="eyebrow hero-mark">PG-DPO</p>
+          <h1>Pontryagin-guided control recovery</h1>
+          <p class="hero-copy">
+            A common computational architecture: simulate a continuation policy, estimate adapted adjoints by BPTT,
+            then enforce the problem-specific local Pontryagin condition in action space.
+          </p>
+        </div>
+        <div class="action-row" aria-label="Animation controls">
+          <button id="playButton" class="button primary" type="button">Play</button>
+          <button id="resetButton" class="button secondary" type="button">Reset</button>
+        </div>
+      </div>
+
+      <div class="notice-row" role="note">
+        <span class="notice-dot" aria-hidden="true"></span>
+        <span><strong>Schematic educational visualization.</strong> Curves and diagnostics illustrate mechanisms; they are not reproduced experiment logs.</span>
+      </div>
+
+      <div class="mode-row">
+        <span class="mode-label">Example</span>
+        <div class="mode-scroll-shell">
+          <div id="modeSwitch" class="mode-switch" role="group" aria-label="Choose a PG-DPO example">
+            <button class="mode-button is-active" type="button" data-mode="core" aria-pressed="true">Core PG-DPO</button>
+            <button class="mode-button" type="button" data-mode="constraints" aria-pressed="false">Constraints</button>
+            <button class="mode-button" type="button" data-mode="transaction" aria-pressed="false">Transaction costs</button>
+            <button class="mode-button" type="button" data-mode="nonexp" aria-pressed="false">Non-exponential</button>
+            <button class="mode-button" type="button" data-mode="delay" aria-pressed="false">Delay / kinks</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="stage-strip" aria-label="PG-DPO stages">
+      <article class="stage-panel" data-stage-index="0">
+        <span class="stage-badge">Stage I</span>
+        <span class="stage-text">Rollout warm-up</span>
+      </article>
+      <article class="stage-panel" data-stage-index="1">
+        <span class="stage-badge stage-badge-2">Stage II-A</span>
+        <span class="stage-text">Adjoint estimation</span>
+      </article>
+      <article class="stage-panel" data-stage-index="2">
+        <span class="stage-badge stage-badge-3">Stage II-B</span>
+        <span class="stage-text">Local recovery</span>
+      </article>
+    </section>
+    <p class="stage-note">The papers group II-A and II-B together as Stage II; the playground separates them to make the mechanism visible.</p>
+
+    <section class="workflow-grid" aria-live="polite">
+      <article class="figure-card">
+        <header class="figure-head">
+          <div>
+            <p class="eyebrow">Figure 1</p>
+            <h2 id="figure1Title">Rollout warm-up</h2>
+          </div>
+          <span id="figure1Badge" class="figure-badge">simulation</span>
+        </header>
+        <canvas id="figure1Canvas" width="640" height="360" aria-label="Stage I visualization"></canvas>
+        <div id="figure1Detail" class="detail-panel" hidden></div>
+        <p id="figure1Caption" class="caption"></p>
+      </article>
+
+      <article class="figure-card">
+        <header class="figure-head">
+          <div>
+            <p class="eyebrow">Figure 2</p>
+            <h2 id="figure2Title">Adapted adjoints</h2>
+          </div>
+          <span id="figure2Badge" class="figure-badge figure-badge-2">BPTT</span>
+        </header>
+        <canvas id="figure2Canvas" width="640" height="360" aria-label="Stage II-A visualization"></canvas>
+        <div id="figure2Detail" class="detail-panel" hidden></div>
+        <p id="figure2Caption" class="caption"></p>
+      </article>
+
+      <article class="figure-card">
+        <header class="figure-head">
+          <div>
+            <p class="eyebrow">Figure 3</p>
+            <h2 id="figure3Title">Local recovery</h2>
+          </div>
+          <span id="figure3Badge" class="figure-badge figure-badge-3">Hamiltonian</span>
+        </header>
+        <canvas id="figure3Canvas" width="640" height="360" aria-label="Stage II-B visualization"></canvas>
+        <div id="figure3Detail" class="detail-panel" hidden></div>
+        <p id="figure3Caption" class="caption"></p>
+      </article>
+    </section>
+
+    <section id="equationsGrid" class="equations-grid" aria-label="Mathematical summary">
+      <article class="eq-card">
+        <h3 id="equation1Title"></h3>
+        <div id="equation1Body" class="eq-body"></div>
+      </article>
+      <article class="eq-card">
+        <h3 id="equation2Title"></h3>
+        <div id="equation2Body" class="eq-body"></div>
+      </article>
+      <article class="eq-card">
+        <h3 id="equation3Title"></h3>
+        <div id="equation3Body" class="eq-body"></div>
+      </article>
+    </section>
+
+    <section class="scope-card" aria-label="Research scope">
+      <div>
+        <p class="eyebrow">Research scope</p>
+        <h2 id="scopeTitle"></h2>
+      </div>
+      <div id="scopeBody" class="scope-body"></div>
+    </section>
+
+    <footer class="footer-note">
+      <span>PG-DPO Playground</span>
+      <span id="footerMode">Core PG-DPO</span>
+    </footer>
+  </main>
+</body>
+</html>
