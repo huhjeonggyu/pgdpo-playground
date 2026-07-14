@@ -39,3 +39,7 @@ python3 -m http.server 3000
 ```
 
 Open `http://localhost:3000`. No build step is required.
+
+## Deployment
+
+This is a static site and can be deployed directly from the repository with Vercel.
